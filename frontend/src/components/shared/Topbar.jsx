@@ -14,7 +14,7 @@ const TopBar = ({ onToggleSidebar, sidebarCollapsed }) => {
     navigate('/login');
   };
 
-const logoSrc = theme === 'light' ? './logo.png' : './logo.png';
+const logoSrc = theme === 'light' ? '/logo.png' : '/logo.png';
   return (
     <header
       className={`shadow sticky top-0 z-100
@@ -48,8 +48,8 @@ const logoSrc = theme === 'light' ? './logo.png' : './logo.png';
           <span
             className={`text-xl font-bold transition hidden md:inline ${
                 theme === 'dark'
-                ? 'text-mbts-orange'
-                : 'text-mbts-orange'
+                ? 'text-orange-500'
+                : 'text-orange-500'
             }`}
             >
             MS. Barkat Transport Service
@@ -67,8 +67,8 @@ const logoSrc = theme === 'light' ? './logo.png' : './logo.png';
               to={`/app/${label.toLowerCase()}${label === 'Dashboard' ? '-dashboard' : ''}`}
               className={`font-medium transition ${
                 theme === 'dark'
-                  ? 'text-mbts-light hover:text-mbts-orange'
-                  : 'text-gray-900 hover:text-mbts-orange'
+                  ? 'text-mbts-light hover:text-orange-500'
+                  : 'text-gray-900 hover:text-orange-500'
               }`}
             >
               {label}
@@ -92,8 +92,8 @@ const logoSrc = theme === 'light' ? './logo.png' : './logo.png';
             onClick={handleLogout}
             className={`px-3 py-1 rounded text-sm transition ${
               theme === 'dark'
-                ? 'bg-mbts-orange hover:bg-mbts-orangeHover text-white'
-                : 'bg-mbts-orange hover:bg-mbts-orangeHover text-white'
+                ? 'bg-orange-500 hover:bg-orange-600 text-white'
+                : 'bg-orange-500 hover:bg-orange-600 text-white'
             }`}
           >
             Logout

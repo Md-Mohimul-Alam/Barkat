@@ -66,7 +66,7 @@ const BankForm = () => {
                     required
                     className={`rounded border px-4 py-2 text-sm outline-none focus:ring-2 transition ${
                       isDark
-                        ? 'bg-mbts-dark border-gray-600 text-white placeholder-gray-400 focus:ring-mbts-orange'
+                        ? 'bg-mbts-dark border-gray-600 text-white placeholder-gray-400 focus:ring-orange-500'
                         : 'bg-gray-50 border-gray-300 text-gray-800 placeholder-gray-500 focus:ring-blue-400'
                     }`}
                   />
@@ -78,8 +78,8 @@ const BankForm = () => {
                   type="submit"
                   className={`px-8 py-2 rounded font-medium text-sm transition-all duration-200 ${
                     isDark
-                      ? 'bg-mbts-orange text-white hover:bg-mbts-orangeHover'
-                      : 'bg-mbts-orange text-white hover:bg-mbts-orangeHover'
+                      ? 'bg-orange-500 text-white hover:bg-orange-500Hover'
+                      : 'bg-orange-500 text-white hover:bg-orange-500Hover'
                   }`}
                 >
                   Save Bank

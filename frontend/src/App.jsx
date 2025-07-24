@@ -4,7 +4,7 @@ import AppRoutes from './routes/AppRoutes';
 import { Toast } from './pages/UI/Toast';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import './index.css'
+import './styles/index.css'
 // 👇 Temporary loading screen while checking auth
 const LoadingScreen = () => (
   <div className="flex items-center justify-center min-h-screen bg-gray-100">
