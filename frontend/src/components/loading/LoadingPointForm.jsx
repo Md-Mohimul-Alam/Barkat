@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import TopBar from '../shared/Topbar';
 import SidebarWrapper from '../shared/Sidebar';
 import Footer from '../shared/Footer';
@@ -7,6 +8,8 @@ import { useTheme } from '../../context/ThemeContext';
 const LoadingPointForm = () => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const navigate = useNavigate();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -27,34 +30,46 @@ const LoadingPointForm = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log('Loading Point Submitted:', formData);
-    // Add to IndexedDB or API call here
+    navigate('/app/loading-points');
   };
 
   return (
-    <>
-      <TopBar />
-      <div className="flex">
-        <SidebarWrapper />
-        <div className={`flex-1 p-6 min-h-screen ${isDark ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
-          <div className="max-w-4xl mx-auto bg-white dark:bg-gray-800 shadow-md rounded-lg p-8">
-            <h2 className="text-2xl font-bold mb-6">Add Loading Point</h2>
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className={`min-h-screen flex ${isDark ? 'bg-cyan-950 text-[#F1FAEE]' : 'bg-[#ffffffaa] text-gray-900'}`}>
+      <SidebarWrapper collapsed={sidebarCollapsed} />
+      <div className="flex-1 flex flex-col">
+        <TopBar onToggleSidebar={() => setSidebarCollapsed(prev => !prev)} sidebarCollapsed={sidebarCollapsed} />
+        
+        <div className="flex justify-center items-start px-4 py-10 overflow-auto">
+          <div className={`w-full max-w-3xl shadow-lg rounded-xl p-8 transition-all duration-300 ${
+            isDark ? 'bg-sky-950 border border-[#457B9D]' : 'bg-white border border-gray-200'
+          }`}>
+            <h2 className="text-2xl font-bold mb-6 text-center">Add Loading Point</h2>
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {fields.map(({ label, name, type }) => (
-                <div key={name}>
-                  <label className="block mb-1 font-medium">{label}</label>
+                <div key={name} className="flex flex-col">
+                  <label className="mb-1 font-medium">{label}</label>
                   <input
                     type={type}
                     name={name}
                     value={formData[name]}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:bg-gray-700 dark:border-gray-600"
+                    required
+                    className={`rounded-lg border px-4 py-3 text-sm outline-none focus:ring-2 transition-all duration-200 ${
+                      isDark
+                        ? 'bg-[#2C2C2C] border-[#457B9D] text-[#F1FAEE] placeholder-[#A8A8A8] focus:ring-[#f85924] focus:border-[#f85924]'
+                        : 'bg-white border-gray-300 text-gray-800 placeholder-gray-500 focus:ring-[#f85924] focus:border-[#f85924]'
+                    }`}
                   />
                 </div>
               ))}
-              <div className="md:col-span-2 text-center mt-4">
+              <div className="md:col-span-2 flex justify-center mt-4">
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition"
+                  className={`px-8 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
+                    isDark
+                      ? 'bg-[#f85924] text-white hover:bg-[#d13602] shadow-lg'
+                      : 'bg-[#f85924] text-white hover:bg-[#d13602] shadow-md'
+                  }`}
                 >
                   Submit
                 </button>
@@ -62,9 +77,9 @@ const LoadingPointForm = () => {
             </form>
           </div>
         </div>
+        <Footer />
       </div>
-      <Footer />
-    </>
+    </div>
   );
 };
 

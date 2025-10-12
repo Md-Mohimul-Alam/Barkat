@@ -1,11 +1,19 @@
 'use strict';
+
 module.exports = (sequelize, DataTypes) => {
-  const Branch = sequelize.define('Branch', {
-    name: DataTypes.STRING,
-    manager: DataTypes.STRING,
-    contact: DataTypes.STRING,
-    address: DataTypes.STRING,
-    establishedAt: DataTypes.DATE
-  }, {});
+  const Branch = sequelize.define(
+    'Branch',
+    {
+      name: { type: DataTypes.STRING, allowNull: false },
+      manager: { type: DataTypes.STRING },
+      contact: { type: DataTypes.STRING },
+      address: { type: DataTypes.STRING },
+      establishedAt: { type: DataTypes.DATE }
+    },
+    {
+      tableName: 'branches', // ensures lowercase table name
+      timestamps: true
+    }
+  );
   return Branch;
 };

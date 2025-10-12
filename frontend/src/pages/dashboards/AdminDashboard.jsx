@@ -12,11 +12,11 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
-      <SidebarWrapper collapsed={sidebarCollapsed} className='bg-transparent'/>
+      <SidebarWrapper collapsed={sidebarCollapsed} className='bg-transparent mt-10'/>
       {/* Main content area */}
       <div className="flex-1 flex flex-col">
         <TopBar onToggleSidebar={handleToggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-        <main className="p-5 flex-1 bg-gray-50">
+        <main className="pt-5 pl-6 flex-1 bg-gray-50">
           <h1 className="text-3xl font-bold text-blue-700 mb-4">Admin Dashboard</h1>
           <p className="mb-6 text-gray-600 text-lg">Welcome, Admin! Here's your system overview.</p>
 

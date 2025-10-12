@@ -112,7 +112,7 @@ const Statements = () => {
   };
 
   return (
-    <div className={`min-h-screen flex ${isDark ? 'bg-mbts-blue text-white' : 'bg-gray-100 text-gray-900'}`}>
+    <div className={`min-h-screen flex ${isDark ? 'bg-cyan-950 text-[#ffffff]' : 'bg-[#ffffff] text-gray-900'}`}>
       {/* Fixed sidebar with full viewport height */}
       <div className="flex-shrink-0 h-screen overflow-hidden">
         <SidebarWrapper collapsed={sidebarCollapsed} />
@@ -129,7 +129,7 @@ const Statements = () => {
           {/* Account Selection */}
           <div
             className={`max-w-3xl w-full mx-auto p-8 rounded-xl shadow-lg border mb-12 ${
-              isDark ? 'bg-[#1c2a3a] border-gray-700' : 'bg-white border-gray-300'
+              isDark ? 'bg-sky-950 border-[#457B9D]' : 'bg-white border-gray-300'
             }`}
           >
             <label htmlFor="accountSelect" className="font-medium text-base mb-2 block">
@@ -139,10 +139,10 @@ const Statements = () => {
               id="accountSelect"
               value={selectedAccount}
               onChange={(e) => setSelectedAccount(e.target.value)}
-              className={`w-full px-4 py-2 rounded border text-sm focus:outline-none focus:ring-2 ${
+              className={`w-full px-4 py-3 rounded-lg border text-sm focus:outline-none focus:ring-2 transition-all duration-200 ${
                 isDark
-                  ? 'bg-mbts-dark border-gray-600 text-white focus:ring-mbts-orange'
-                  : 'bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-400'
+                  ? 'bg-[#2C2C2C] border-[#457B9D] text-[#ffffff] focus:ring-[#f85924] focus:border-[#f85924]'
+                  : 'bg-white border-gray-300 text-gray-900 focus:ring-[#f85924] focus:border-[#f85924]'
               }`}
             >
               <option value="">-- Select Account --</option>
@@ -158,34 +158,34 @@ const Statements = () => {
           {selectedAccount ? (
             <div
               className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-6 rounded-xl shadow-md border mb-10 ${
-                isDark ? 'bg-[#1c2a3a] border-gray-700' : 'bg-white border-gray-200'
+                isDark ? 'bg-sky-950 border-[#457B9D]' : 'bg-white border-gray-200'
               }`}
             >
               <div>
-                <p className="text-sm font-medium">Bank Name:</p>
+                <p className="text-sm font-medium text-[#A8A8A8]">Bank Name:</p>
                 <p className="text-lg">{bankDetails.name}</p>
               </div>
               <div>
-                <p className="text-sm font-medium">Branch:</p>
+                <p className="text-sm font-medium text-[#A8A8A8]">Branch:</p>
                 <p className="text-lg">{bankDetails.branch}</p>
               </div>
               <div>
-                <p className="text-sm font-medium">Account Number:</p>
+                <p className="text-sm font-medium text-[#A8A8A8]">Account Number:</p>
                 <p className="text-lg">{bankDetails.accountNumber}</p>
               </div>
               <div>
-                <p className="text-sm font-medium">Current Balance:</p>
+                <p className="text-sm font-medium text-[#A8A8A8]">Current Balance:</p>
                 <p className="text-lg font-bold text-green-600">৳{bankDetails.currentBalance}</p>
               </div>
             </div>
           ) : (
-            <p className="text-center text-gray-500 italic mb-10">Please select an account to view details.</p>
+            <p className="text-center text-[#A8A8A8] italic mb-10">Please select an account to view details.</p>
           )}
 
           {/* Transactions */}
           {selectedAccount && (
             <div className={`overflow-x-auto rounded-xl shadow-lg border mb-10 ${
-              isDark ? 'bg-[#1c2a3a] border-gray-700' : 'bg-white border-gray-200'
+              isDark ? 'bg-sky-950 border-[#457B9D]' : 'bg-white border-gray-200'
             }`}>
               <div className="flex justify-between items-center p-4">
                 <h2 className="text-2xl font-bold">Transactions</h2>
@@ -193,13 +193,13 @@ const Statements = () => {
                   <div className="flex gap-3">
                     <button
                       onClick={exportCSV}
-                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm"
+                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition-colors duration-200"
                     >
                       Export CSV
                     </button>
                     <button
                       onClick={exportPDF}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm"
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors duration-200"
                     >
                       Export PDF
                     </button>
@@ -209,11 +209,11 @@ const Statements = () => {
 
               <table className="w-full table-auto border-collapse text-sm">
                 <thead>
-                  <tr className={`${isDark ? 'border-b border-gray-700' : 'border-b border-gray-300'}`}>
+                  <tr className={`${isDark ? 'border-b border-[#457B9D]' : 'border-b border-gray-300'}`}>
                     {['Date', 'Description', 'Debit', 'Credit', 'Balance'].map(heading => (
                       <th
                         key={heading}
-                        className={`px-6 py-4 text-center font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}
+                        className={`px-6 py-4 text-center font-semibold ${isDark ? 'text-[#ffffff]' : 'text-gray-700'}`}
                       >
                         {heading}
                       </th>
@@ -223,7 +223,7 @@ const Statements = () => {
                 <tbody>
                   {transactions.length === 0 ? (
                     <tr>
-                      <td colSpan="5" className="text-center py-12 text-gray-400 italic">
+                      <td colSpan="5" className="text-center py-12 text-[#A8A8A8] italic">
                         No transactions available.
                       </td>
                     </tr>
@@ -231,8 +231,8 @@ const Statements = () => {
                     transactions.map((txn, idx) => (
                       <tr
                         key={idx}
-                        className={`${idx % 2 === 0 ? (isDark ? 'bg-[#213549]' : 'bg-gray-50') : ''} border-b ${
-                          isDark ? 'border-gray-700' : 'border-gray-200'
+                        className={`${idx % 2 === 0 ? (isDark ? 'bg-[#2C2C2C]' : 'bg-gray-50') : ''} border-b ${
+                          isDark ? 'border-[#457B9D]' : 'border-gray-200'
                         }`}
                       >
                         <td className="px-6 py-4 text-center">{txn.date}</td>

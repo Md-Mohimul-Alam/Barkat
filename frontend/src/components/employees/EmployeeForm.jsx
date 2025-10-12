@@ -1,15 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
+import { getBranches } from '../../services/branchService'; // You'll need to create this
 import TopBar from '../shared/Topbar';
 import SidebarWrapper from '../shared/Sidebar';
 import Footer from '../shared/Footer';
 
 const EmployeeForm = () => {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const isDark = theme === 'dark';
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [branches, setBranches] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -17,7 +22,24 @@ const EmployeeForm = () => {
     contact: '',
     email: '',
     joinedAt: '',
+    branchId: '', // Add branch field
   });
+
+  // Fetch branches on component mount
+  useEffect(() => {
+    const fetchBranches = async () => {
+      try {
+        const branchesData = await getBranches(user.token); // You need to create this service
+        setBranches(branchesData);
+      } catch (error) {
+        console.error('Failed to fetch branches:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBranches();
+  }, [user.token]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -31,14 +53,14 @@ const EmployeeForm = () => {
   };
 
   return (
-    <div className={`min-h-screen flex ${isDark ? 'bg-mbts-blue text-white' : 'bg-gray-100 text-gray-900'}`}>
+    <div className={`min-h-screen flex ${isDark ? 'bg-cyan-950 text-[#ffffff]' : 'bg-[#ffffff] text-gray-900'}`}>
       <SidebarWrapper collapsed={sidebarCollapsed} />
       <div className="flex-1 flex flex-col">
         <TopBar onToggleSidebar={() => setSidebarCollapsed(prev => !prev)} sidebarCollapsed={sidebarCollapsed} />
         
         <div className="flex justify-center items-start px-4 py-10 overflow-auto">
           <div className={`w-full max-w-3xl shadow-lg rounded-xl p-8 transition-all duration-300
-            ${isDark ? 'bg-[#1c2a3a] border border-gray-700' : 'bg-white border border-gray-200'}
+            ${isDark ? 'bg-sky-950 border border-[#457B9D]' : 'bg-white border border-gray-200'}
           `}>
             <h2 className="text-2xl font-bold mb-6 text-center">Add New Employee</h2>
 
@@ -63,23 +85,52 @@ const EmployeeForm = () => {
                     value={formData[field.name]}
                     onChange={handleChange}
                     required
-                    className={`rounded border px-4 py-2 text-sm outline-none focus:ring-2 transition ${
+                    className={`rounded-lg border px-4 py-3 text-sm outline-none focus:ring-2 transition-all duration-200 ${
                       isDark
-                        ? 'bg-mbts-dark border-gray-600 text-white focus:ring-mbts-orange'
-                        : 'bg-gray-50 border-gray-300 text-gray-800 focus:ring-blue-400'
+                        ? 'bg-[#2C2C2C] border-[#457B9D] text-[#ffffff] placeholder-[#A8A8A8] focus:ring-[#f85924] focus:border-[#f85924]'
+                        : 'bg-white border-gray-300 text-gray-800 placeholder-gray-500 focus:ring-[#f85924] focus:border-[#f85924]'
                     }`}
                   />
                 </div>
               ))}
 
-              {/* Full-width submit button */}
+              {/* Branch Dropdown */}
+              <div className="flex flex-col">
+                <label htmlFor="branchId" className="mb-1 font-medium">
+                  Branch
+                </label>
+                <select
+                  id="branchId"
+                  name="branchId"
+                  value={formData.branchId}
+                  onChange={handleChange}
+                  required
+                  className={`rounded-lg border px-4 py-3 text-sm outline-none focus:ring-2 transition-all duration-200 ${
+                    isDark
+                      ? 'bg-[#2C2C2C] border-[#457B9D] text-[#ffffff] focus:ring-[#f85924] focus:border-[#f85924]'
+                      : 'bg-white border-gray-300 text-gray-800 focus:ring-[#f85924] focus:border-[#f85924]'
+                  }`}
+                >
+                  <option value="">Select a branch</option>
+                  {loading ? (
+                    <option value="" disabled>Loading branches...</option>
+                  ) : (
+                    branches.map((branch) => (
+                      <option key={branch._id} value={branch._id}>
+                        {branch.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
               <div className="md:col-span-2 flex justify-center mt-4">
                 <button
                   type="submit"
-                  className={`px-8 py-2 rounded font-medium text-sm transition-all duration-200 ${
+                  className={`px-8 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
                     isDark
-                      ? 'bg-mbts-orange text-white hover:bg-mbts-orangeHover'
-                      : 'bg-mbts-orange text-white hover:bg-mbts-orangeHover'
+                      ? 'bg-[#f85924] text-white hover:bg-[#d13602] shadow-lg'
+                      : 'bg-[#f85924] text-white hover:bg-[#d13602] shadow-md'
                   }`}
                 >
                   Save Employee

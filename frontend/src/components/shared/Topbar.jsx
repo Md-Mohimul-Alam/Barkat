@@ -14,17 +14,35 @@ const TopBar = ({ onToggleSidebar, sidebarCollapsed }) => {
     navigate('/login');
   };
 
-const logoSrc = theme === 'light' ? '/logo.png' : '/logo.png';
+
+const handleLogoClick = () => {
+  switch (user?.role) {
+    case 'admin':
+      navigate('/app/admin-dashboard');
+      break;
+    case 'manager':
+      navigate('/app/manager-dashboard');
+      break;
+    case 'branchManager':
+      navigate('/app/branch');
+      break;
+    default:
+      navigate('/dashboard'); // fallback
+  }
+};
+
+
+const logoSrc = theme === 'light' ? '/logo.png' : '/logo2.png';
   return (
     <header
-      className={`shadow sticky top-0 z-100
-        ${theme === 'dark' ? 'bg-mbts-blue text-mbts-light' : 'bg-white text-gray-900'}
+      className={`shadow m-0 top-0 z-100 border-b-2 border-b-orange-700
+        ${theme === 'dark' ? 'bg-cyan-950 text-white border-b-2 border-b-orange-700' : 'bg-white text-gray-900'}
       `}
     >
-      <div className="w-full h-16 flex items-center justify-between px-4 md:px-8">
+      <div className="w-full h-16 m-0 flex items-center justify-between px-4 md:px-8">
         {/* Logo + Hamburger */}
         <div className="flex items-center space-x-2">
-          <div className={`${theme === 'dark' ? 'bg-mbts-blue' : 'bg-white'} mr-2`}>
+          <div className={`${theme === 'dark' ? 'bg-cyan-950' : 'bg-white'} mr-2`}>
             <Hamburger
               size={24}
               color={theme === 'dark' ? '#F1FAEE' : '#1D3557'}
@@ -33,17 +51,21 @@ const logoSrc = theme === 'light' ? '/logo.png' : '/logo.png';
             />
           </div>
 
-          <div
-            className={`p-1 flex items-center justify-center h-14 w-20 ${
-              theme === 'dark' ? 'bg-mbts-blue' : 'bg-white'
-            }`}
-          >
-            <img
-              src={logoSrc}
-              alt="MBTSMS Logo"
-              className="mx-auto object-contain overflow-hidden"
-            />
-          </div>
+          {user?.role && (
+            <div
+              onClick={handleLogoClick}
+              className={`p-1 flex items-center justify-center h-14 w-20 cursor-pointer ${
+                theme === 'dark' ? 'bg-cyan-950' : 'bg-white'
+              }`}
+            >
+              <img
+                src={logoSrc}
+                alt="MBTSMS Logo"
+                className="mx-auto object-contain overflow-hidden"
+              />
+            </div>
+          )}
+
 
           <span
             className={`text-xl font-bold transition hidden md:inline ${
@@ -80,12 +102,18 @@ const logoSrc = theme === 'light' ? '/logo.png' : '/logo.png';
 
         {/* Profile / Logout / Theme Toggle */}
         <div className="flex items-center space-x-4">
-          <span
-            className={`${
+          <span className={`${
               theme === 'dark' ? 'text-white' : 'text-gray-900'
             } text-sm hidden sm:inline`}
           >
-            Welcome, {user?.name || 'User'}
+            Welcome,
+          </span>
+          <span
+            className={`${
+              theme === 'dark' ? 'text-orange-700' : 'text-orange-700'
+            } text-sm hidden sm:inline`}
+          >
+           {user?.name || 'User'}
           </span>
 
           <button
@@ -103,8 +131,8 @@ const logoSrc = theme === 'light' ? '/logo.png' : '/logo.png';
             onClick={toggleTheme}
             className={`px-3 py-1 h-15 w-15 text-lg transition ${
               theme === 'dark'
-                ? 'bg-transparent text-white hover:text-mbts-blue'
-                : 'bg-transparent text-gray-900 hover:text-mbts-blue'
+                ? 'bg-transparent text-white hover:text-cyan-950'
+                : 'bg-transparent text-gray-900 hover:text-cyan-950'
             }`}
             aria-label="Toggle theme"
           >

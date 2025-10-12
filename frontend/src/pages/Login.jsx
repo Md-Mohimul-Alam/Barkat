@@ -141,11 +141,19 @@ const Login = () => {
 
           <button
             type="submit"
-            className="w-full bg-mbts-orange text-mbts-orange py-2 rounded hover:bg-mbts-orangeHover transition"
+            className="w-full bg-orange-600 text-white py-2 rounded hover:bg-orange-700 transition"
           >
             Sign In
           </button>
         </form>
+        <div className="mt-4 text-center">
+          <p className="text-sm text-gray-600">
+            Don't have an account?{' '}
+            <Link to="/register" className="text-orange-500 hover:underline">
+              Sign Up
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

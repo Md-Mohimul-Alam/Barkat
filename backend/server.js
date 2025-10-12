@@ -1,38 +1,36 @@
 // backend/server.js
+require('dotenv').config();
 const express = require('express');
-const dotenv = require('dotenv');
 const cors = require('cors');
-const { sequelize } = require('./models');
+const { sequelize } = require('./models'); // make sure this exports { sequelize }
 const authRoutes = require('./routes/auth');
 const branchRoutes = require('./routes/branchRoutes');
 const transportRoutes = require('./routes/transportRoutes');
 const { authenticate, authorizeRoles } = require('./middlewares/auth');
 
-dotenv.config();
-
 const app = express();
 
-// CORS Config for frontend
+// ✅ CORS configuration for frontend
 const corsOptions = {
-  origin: "http://localhost:5173",
+  origin: 'http://localhost:5173',
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 };
 
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Routes
+// ✅ Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/branches', branchRoutes);
 app.use('/api/transport', transportRoutes);
 
-// Protected test routes
+// ✅ Protected test routes
 app.get(
-  "/api/dashboard",
+  '/api/dashboard',
   authenticate,
-  authorizeRoles("admin-dashboard", "manager-dashboard", "employee-dashboard"),
+  authorizeRoles('admin-dashboard', 'manager-dashboard', 'employee-dashboard'),
   (req, res) => {
     res.json({
       message: `Welcome ${req.user.name} to your dashboard!`,
@@ -41,8 +39,8 @@ app.get(
   }
 );
 
-
-app.get('/api/admin/data',
+app.get(
+  '/api/admin/data',
   authenticate,
   authorizeRoles('admin-dashboard'),
   (req, res) => {
@@ -50,21 +48,26 @@ app.get('/api/admin/data',
   }
 );
 
-// Health check
+// ✅ Health check
 app.get('/', (req, res) => {
   res.send('🚀 MBTSMS backend running...');
 });
 
-// Server
+// ✅ Start server and sync DB
 const PORT = process.env.PORT || 5050;
+
 app.listen(PORT, async () => {
   try {
+    // 1️⃣ Authenticate DB connection
     await sequelize.authenticate();
-    console.log(`✅ Connected to PostgreSQL`);
+    console.log('✅ Connected to PostgreSQL');
+
+    // 2️⃣ Sync models (creates tables if missing)
+    await sequelize.sync({ alter: true }); // use `force: true` only if you want to drop & recreate tables
+    console.log('✅ All models synced successfully');
+
+    console.log(`✅ Backend server running on http://localhost:${PORT}`);
   } catch (err) {
-    console.error('❌ DB Connection Error:', err.message);
+    console.error('❌ DB Connection / Sync Error:', err.message);
   }
-
-  console.log(`✅ Backend server running on http://localhost:${PORT}`);
 });
-

@@ -161,7 +161,7 @@ const CalculatorPage = () => {
   };
 
   return (
-    <div className={`h-screen flex overflow-hidden ${isDark ? 'bg-mbts-blue text-white' : 'bg-gray-100 text-gray-900'}`}>
+    <div className={`h-screen  flex overflow-hidden ${isDark ? 'bg-mbts-blue text-white' : 'bg-gray-100 text-gray-900'}`}>
       <SidebarWrapper collapsed={sidebarCollapsed}/>
         <div className="flex-1 flex flex-col h-full overflow-hidden">
           <div className="sticky top-0 z-50">
@@ -172,18 +172,21 @@ const CalculatorPage = () => {
           </div>
 
           {/* Main Content Area */}
-          <div className='h-full w-full relative overflow-y-auto mb-10'> 
+          <div className='h-full w-f relative overflow-y-auto mb-10'> 
             <div className='flex-1 flex flex-col h-full overflow-y-auto'>
               <div className="flex justify-center items-start  overflow-auto w-full">
                 <div
-                  className={`w-full max-w-6xl shadow-lg rounded-l p-8 transition-all duration-300
+                  className={`w-full max-w-9xl shadow-lg rounded-l p-8 transition-all duration-300
                   ${
                     isDark
-                      ? 'bg-[#1c2a3a] border border-gray-700'
+                      ? 'bg-cyan-950 border border-gray-700'
                       : 'bg-white border border-gray-200'
                   }
                 `}
                 >
+                  <h1 className="text-3xl font-bold mb-6 text-center">
+                    Vehicle Cost Calculator
+                  </h1>
                   {/* Weight Entry Card */}
                   <div className="border rounded p-4 mb-6">
                     <h3 className="font-bold mb-4">Weight Entry</h3>
@@ -210,7 +213,7 @@ const CalculatorPage = () => {
                           type="button"
                           onClick={triggerImageUpload}
                           disabled={isProcessingImage}
-                          className={`px-3 py-1 rounded bg-mbts-orange text-white hover:bg-mbts-orangeHover${
+                          className={`px-3 py-1 rounded bg-orange-500 text-white hover:bg-orange-600${
                             isProcessingImage ? 'opacity-50 cursor-not-allowed' : ''
                           }`}
                           aria-label="Upload weights from image"
@@ -247,7 +250,7 @@ const CalculatorPage = () => {
                           step="0.1"
                           className={`flex-1 rounded border px-3 py-1 text-sm outline-none focus:ring-2 transition ${
                             isDark
-                              ? 'bg-mbts-dark border-gray-600 text-white focus:ring-mbts-orange'
+                              ? 'bg-zinc-950 border-gray-600 text-white focus:ring-orange-500'
                               : 'bg-gray-50 border-gray-300 text-gray-800 focus:ring-blue-400'
                           }`}
                         />
@@ -310,7 +313,7 @@ const CalculatorPage = () => {
                                     placeholder="Enter fixed rate"
                                     className={`rounded border px-4 py-2 w-full text-sm outline-none focus:ring-2 transition ${
                                       isDark
-                                        ? 'bg-mbts-dark border-gray-600 text-gray-800 focus:ring-mbts-orange'
+                                        ? 'bg-zinc-950 border-gray-600 text-gray-800 focus:ring-orange-500'
                                         : 'bg-gray-50 border-gray-300 text-gray-800'
                                     }`}
                                   />
@@ -338,7 +341,7 @@ const CalculatorPage = () => {
                                       disabled={!!rates.solid}
                                       className={`rounded border px-4 py-2 w-full text-sm outline-none focus:ring-2 transition ${
                                         isDark
-                                          ? 'bg-mbts-dark border-gray-600 text-white focus:ring-mbts-orange'
+                                          ? 'bg-zinc-950 border-gray-600 text-white focus:ring-orange-500'
                                           : 'bg-gray-50 border-gray-300 text-gray-800 focus:ring-blue-400'
                                       }`}
                                     />
@@ -365,7 +368,7 @@ const CalculatorPage = () => {
                                       disabled={!!rates.solid}
                                       className={`rounded border px-4 py-2 w-full text-sm outline-none focus:ring-2 transition ${
                                         isDark
-                                          ? 'bg-mbts-dark border-gray-600 text-white focus:ring-mbts-orange'
+                                          ? 'bg-zinc-950 border-gray-600 text-white focus:ring-orange-500'
                                           : 'bg-gray-50 border-gray-300 text-gray-800 focus:ring-blue-400'
                                       }`}
                                     />
@@ -391,12 +394,12 @@ const CalculatorPage = () => {
                           : 'bg-gray-50 border-gray-200 text-gray-900'
                       }`}
                     >
-                      <h3 className="font-bold mb-4 p-3 text-3xl text-mbts-orange"> ⭐ ⭐ ⭐ Recommended Solution</h3>
+                      <h3 className="font-bold mb-4 p-3 text-3xl text-orange-500"> ⭐ ⭐ ⭐ Recommended Solution</h3>
 
                       <div className="bg-gradient-to-rp-6 rounded-lg shadow-md">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-5">
                           <div className="p-2">
-                            <div className="text-2xl font-bold text-primary capitalize text-mbts-orange">
+                            <div className="text-2xl font-bold text-primary capitalize text-orange-500">
                               {formatVehicleTypeLabel(recommended.vehicleType)}
                             </div>
                             <div className="text-sm text-muted-foreground">

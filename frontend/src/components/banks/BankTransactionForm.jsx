@@ -34,7 +34,6 @@ const BankTransactionForm = () => {
     e.preventDefault();
     if (!selectedAccount) return alert('Please select an account first!');
     console.log('Bank transaction submitted for', selectedAccount, formData);
-    // API call can go here
 
     setFormData({
       date: '',
@@ -46,7 +45,7 @@ const BankTransactionForm = () => {
   };
 
   return (
-    <div className={`min-h-screen flex ${isDark ? 'bg-mbts-blue text-white' : 'bg-gray-100 text-gray-900'}`}>
+    <div className={`min-h-screen flex ${isDark ? 'bg-cyan-950 text-[#ffffff]' : 'bg-[#ffffff] text-gray-900'}`}>
       <SidebarWrapper collapsed={sidebarCollapsed} />
       <div className="flex-1 flex flex-col">
         <TopBar onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)} sidebarCollapsed={sidebarCollapsed} />
@@ -54,7 +53,7 @@ const BankTransactionForm = () => {
         <div className="flex justify-center items-start px-4 py-10 overflow-auto w-full">
           <div
             className={`w-full max-w-3xl shadow-lg rounded-xl p-8 transition-all duration-300 ${
-              isDark ? 'bg-[#1c2a3a] border border-gray-700' : 'bg-white border border-gray-200'
+              isDark ? 'bg-sky-950 border border-[#457B9D]' : 'bg-white border border-gray-200'
             }`}
           >
             <h2 className="text-2xl font-bold mb-6 text-center">Manual Bank Transaction Entry</h2>
@@ -68,10 +67,10 @@ const BankTransactionForm = () => {
                 id="accountSelect"
                 value={selectedAccount}
                 onChange={(e) => setSelectedAccount(e.target.value)}
-                className={`w-full px-4 py-2 rounded border text-sm focus:outline-none focus:ring-2 ${
+                className={`w-full px-4 py-3 rounded-lg border text-sm focus:outline-none focus:ring-2 transition-all duration-200 ${
                   isDark
-                    ? 'bg-mbts-dark border-gray-600 text-white focus:ring-mbts-orange'
-                    : 'bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-400'
+                    ? 'bg-[#2C2C2C] border-[#457B9D] text-[#ffffff] focus:ring-[#f85924] focus:border-[#f85924]'
+                    : 'bg-white border-gray-300 text-gray-900 focus:ring-[#f85924] focus:border-[#f85924]'
                 }`}
               >
                 <option value="">-- Select Account --</option>
@@ -96,10 +95,10 @@ const BankTransactionForm = () => {
                     value={formData.date}
                     onChange={handleChange}
                     required
-                    className={`rounded border px-4 py-2 text-sm outline-none focus:ring-2 ${
+                    className={`rounded-lg border px-4 py-3 text-sm outline-none focus:ring-2 transition-all duration-200 ${
                       isDark
-                        ? 'bg-mbts-dark border-gray-600 text-white focus:ring-mbts-orange'
-                        : 'bg-gray-50 border-gray-300 text-gray-800 focus:ring-blue-400'
+                        ? 'bg-[#2C2C2C] border-[#457B9D] text-[#ffffff] focus:ring-[#f85924] focus:border-[#f85924]'
+                        : 'bg-white border-gray-300 text-gray-800 focus:ring-[#f85924] focus:border-[#f85924]'
                     }`}
                   />
                 </div>
@@ -114,10 +113,10 @@ const BankTransactionForm = () => {
                     value={formData.transactionNumber}
                     onChange={handleChange}
                     required
-                    className={`rounded border px-4 py-2 text-sm outline-none focus:ring-2 ${
+                    className={`rounded-lg border px-4 py-3 text-sm outline-none focus:ring-2 transition-all duration-200 ${
                       isDark
-                        ? 'bg-mbts-dark border-gray-600 text-white focus:ring-mbts-orange'
-                        : 'bg-gray-50 border-gray-300 text-gray-800 focus:ring-blue-400'
+                        ? 'bg-[#2C2C2C] border-[#457B9D] text-[#ffffff] focus:ring-[#f85924] focus:border-[#f85924]'
+                        : 'bg-white border-gray-300 text-gray-800 focus:ring-[#f85924] focus:border-[#f85924]'
                     }`}
                   />
                 </div>
@@ -130,10 +129,10 @@ const BankTransactionForm = () => {
                     name="type"
                     value={formData.type}
                     onChange={handleChange}
-                    className={`rounded border px-4 py-2 text-sm outline-none focus:ring-2 ${
+                    className={`rounded-lg border px-4 py-3 text-sm outline-none focus:ring-2 transition-all duration-200 ${
                       isDark
-                        ? 'bg-mbts-dark border-gray-600 text-white focus:ring-mbts-orange'
-                        : 'bg-gray-50 border-gray-300 text-gray-800 focus:ring-blue-400'
+                        ? 'bg-[#2C2C2C] border-[#457B9D] text-[#ffffff] focus:ring-[#f85924] focus:border-[#f85924]'
+                        : 'bg-white border-gray-300 text-gray-800 focus:ring-[#f85924] focus:border-[#f85924]'
                     }`}
                   >
                     <option value="credit">Credit</option>
@@ -151,10 +150,10 @@ const BankTransactionForm = () => {
                     value={formData.description}
                     onChange={handleChange}
                     required
-                    className={`rounded border px-4 py-2 text-sm outline-none focus:ring-2 ${
+                    className={`rounded-lg border px-4 py-3 text-sm outline-none focus:ring-2 transition-all duration-200 ${
                       isDark
-                        ? 'bg-mbts-dark border-gray-600 text-white focus:ring-mbts-orange'
-                        : 'bg-gray-50 border-gray-300 text-gray-800 focus:ring-blue-400'
+                        ? 'bg-[#2C2C2C] border-[#457B9D] text-[#ffffff] focus:ring-[#f85924] focus:border-[#f85924]'
+                        : 'bg-white border-gray-300 text-gray-800 focus:ring-[#f85924] focus:border-[#f85924]'
                     }`}
                   />
                 </div>
@@ -170,10 +169,10 @@ const BankTransactionForm = () => {
                     value={formData.amount}
                     onChange={handleChange}
                     required
-                    className={`rounded border px-4 py-2 text-sm outline-none focus:ring-2 ${
+                    className={`rounded-lg border px-4 py-3 text-sm outline-none focus:ring-2 transition-all duration-200 ${
                       isDark
-                        ? 'bg-mbts-dark border-gray-600 text-white focus:ring-mbts-orange'
-                        : 'bg-gray-50 border-gray-300 text-gray-800 focus:ring-blue-400'
+                        ? 'bg-[#2C2C2C] border-[#457B9D] text-[#ffffff] focus:ring-[#f85924] focus:border-[#f85924]'
+                        : 'bg-white border-gray-300 text-gray-800 focus:ring-[#f85924] focus:border-[#f85924]'
                     }`}
                   />
                 </div>
@@ -182,10 +181,10 @@ const BankTransactionForm = () => {
                 <div className="md:col-span-2 flex justify-center mt-4">
                   <button
                     type="submit"
-                    className={`px-8 py-2 rounded font-medium text-sm transition-all duration-200 ${
+                    className={`px-8 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
                       isDark
-                        ? 'bg-mbts-orange text-white hover:bg-mbts-orangeHover'
-                        : 'bg-mbts-orange text-white hover:bg-mbts-orangeHover'
+                        ? 'bg-[#f85924] text-white hover:bg-[#d13602] shadow-lg'
+                        : 'bg-[#f85924] text-white hover:bg-[#d13602] shadow-md'
                     }`}
                   >
                     Save Transaction
