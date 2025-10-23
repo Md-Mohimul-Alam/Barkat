@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Sidebar,
   Menu,
-  MenuItem,
+ MenuItem,
   SubMenu,
 } from 'react-pro-sidebar';
 import {
@@ -17,140 +17,221 @@ import {
   FaWrench,
   FaRoad,
   FaCalculator,
+  FaHome,
+  FaUserCircle,
+  FaCog,
+  FaSignOutAlt,
+  FaBars,
+  FaRegCircle,
+  FaDotCircle
 } from 'react-icons/fa';
-import { MdExpandMore } from 'react-icons/md';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 
-const SidebarMenu = ({ collapsed }) => {
+const SidebarMenu = ({ collapsed, onToggle }) => {
   const { theme } = useTheme();
-  const { user } = useAuth(); // Get logged-in user
+  const { user, logout } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const isDark = theme === 'dark';
 
-  const [openIndex, setOpenIndex] = useState(null);
+  const [openMenus, setOpenMenus] = useState({});
+  const [activePath, setActivePath] = useState(location.pathname);
 
-  const handleToggle = (index) => {
-    setOpenIndex(openIndex === index ? null : index);
+  // Update active path when location changes
+  useEffect(() => {
+    setActivePath(location.pathname);
+  }, [location.pathname]);
+
+  // Auto-open parent menu when child is active
+  useEffect(() => {
+    const newOpenMenus = {};
+    menuItems.forEach(item => {
+      if (item.children) {
+        const isChildActive = item.children.some(child => 
+          location.pathname === child.path
+        );
+        if (isChildActive) {
+          newOpenMenus[item.key] = true;
+        }
+      }
+    });
+    setOpenMenus(newOpenMenus);
+  }, [location.pathname]);
+
+  const handleToggle = (menuKey) => {
+    setOpenMenus(prev => {
+      if (!prev[menuKey]) {
+        const newState = {};
+        menuItems.forEach(item => {
+          if (item.children && item.key !== menuKey) {
+            newState[item.key] = false;
+          }
+        });
+        newState[menuKey] = true;
+        return newState;
+      } else {
+        return {
+          ...prev,
+          [menuKey]: false
+        };
+      }
+    });
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
 
   const menuItems = [
     {
+      key: 'dashboard',
+      label: 'Dashboard',
+      icon: <FaHome className="w-5 h-5" />,
+      allowedRoles: ['admin', 'manager', 'employee'],
+      path: '/app/admin-dashboard'
+    },
+    {
+      key: 'branch',
       label: 'Branch Management',
-      icon: <FaBuilding />,
+      icon: <FaBuilding className="w-5 h-5" />,
       allowedRoles: ['admin'],
       children: [
-        { label: 'View Branches', path: '/app/branches' },
-        { label: 'Add Branch', path: '/app/branches/add' },
+        { key: 'view-branches', label: 'View Branches', path: '/app/branches' },
+        { key: 'add-branch', label: 'Add Branch', path: '/app/branches/add' },
       ],
     },
     {
+      key: 'client',
       label: 'Client Management',
-      icon: <FaUsers />,
+      icon: <FaUsers className="w-5 h-5" />,
       allowedRoles: ['admin', 'manager'],
       children: [
-        { label: 'Clients', path: '/app/clients' },
-        { label: 'Add Client', path: '/app/clients/add' },
+        { key: 'view-clients', label: 'Clients', path: '/app/clients' },
+        { key: 'add-client', label: 'Add Client', path: '/app/clients/add' },
       ],
     },
     {
+      key: 'cnf',
       label: 'CNF Management',
-      icon: <FaUsers />,
+      icon: <FaUsers className="w-5 h-5" />,
       allowedRoles: ['admin'],
       children: [
-        { label: 'CNF List', path: '/app/cnfs' },
-        { label: 'Add CNF', path: '/app/cnfs/add' },
+        { key: 'view-cnfs', label: 'CNF List', path: '/app/cnfs' },
+        { key: 'add-cnf', label: 'Add CNF', path: '/app/cnfs/add' },
       ],
     },
     {
+      key: 'employee',
       label: 'Employee Management',
-      icon: <FaUserShield />,
+      icon: <FaUserShield className="w-5 h-5" />,
       allowedRoles: ['admin'],
       children: [
-        { label: 'Employees', path: '/app/employees' },
-        { label: 'Add Employee', path: '/app/employees/add' },
+        { key: 'view-employees', label: 'Employees', path: '/app/employees' },
+        { key: 'add-employee', label: 'Add Employee', path: '/app/employees/add' },
       ],
     },
     {
-      label: 'Loading-Point Management',
-      icon: <FaRoad />,
+      key: 'loading-point',
+      label: 'Loading Points',
+      icon: <FaRoad className="w-5 h-5" />,
       allowedRoles: ['admin', 'manager'],
       children: [
-        { label: 'Loading Point List', path: '/app/loading-points/list' },
-        { label: 'Add Loading Point', path: '/app/loading-points/add' },
+        { key: 'view-loading-points', label: 'Loading Points', path: '/app/loading-points/list' },
+        { key: 'add-loading-point', label: 'Add Loading Point', path: '/app/loading-points/add' },
       ],
     },
     {
+      key: 'unloading-point',
+      label: 'Unloading Points',
+      icon: <FaRoad className="w-5 h-5" />,
+      allowedRoles: ['admin', 'manager'],
+      children: [
+        { key: 'view-unloading-points', label: 'Unloading Points', path: '/app/unloading-points/list' },
+        { key: 'add-unloading-point', label: 'Add Unloading Point', path: '/app/unloading-points/add' },
+      ],
+    },
+    {
+      key: 'vehicle',
       label: 'Vehicle Management',
-      icon: <FaTruck />,
+      icon: <FaTruck className="w-5 h-5" />,
       allowedRoles: ['admin', 'manager'],
       children: [
-        { label: 'Vehicles', path: '/vehicles' },
-        { label: 'Add Vehicle', path: '/vehicles/add' },
+        { key: 'view-vehicles', label: 'Vehicles', path: '/app/vehicles' },
+        { key: 'add-vehicle', label: 'Add Vehicle', path: '/app/vehicles/add' },
       ],
     },
     {
+      key: 'bank',
       label: 'Bank Module',
-      icon: <FaFileInvoiceDollar />,
+      icon: <FaFileInvoiceDollar className="w-5 h-5" />,
       allowedRoles: ['admin'],
       children: [
-        { label: 'ADD Bank', path: '/app/banks/add' },
-        { label: 'Statements Download', path: '/app/banks/statements' },
-        { label: 'ADD Transactions', path: '/app/banks/transactions/add' },
-        { label: 'Bank Transactions', path: '/app/banks/transactions/list' },
+        { key: 'add-bank', label: 'ADD Bank', path: '/app/banks/add' },
+        { key: 'statements', label: 'Statements Download', path: '/app/banks/statements' },
+        { key: 'add-transaction', label: 'ADD Transactions', path: '/app/banks/transactions/add' },
+        { key: 'view-transactions', label: 'Bank Transactions', path: '/app/banks/transactions/list' },
       ],
     },
     {
+      key: 'due',
       label: 'Due Tracking',
-      icon: <FaTasks />,
+      icon: <FaTasks className="w-5 h-5" />,
       allowedRoles: ['admin', 'manager'],
       children: [
-        { label: 'All Dues', path: '/app/dues' },
-        { label: 'Due Reports', path: '/app/dues/reports' },
+        { key: 'all-dues', label: 'All Dues', path: '/app/dues' },
+        { key: 'due-reports', label: 'Due Reports', path: '/app/dues/reports' },
       ],
     },
     {
+      key: 'calculator',
       label: 'Calculator',
-      icon: <FaCalculator />,
+      icon: <FaCalculator className="w-5 h-5" />,
       allowedRoles: ['admin'],
       children: [
-        { label: 'Estimate', path: '/app/calculator/CalculatorPage' },
+        { key: 'estimate', label: 'Estimate', path: '/app/calculator/CalculatorPage' },
       ],
     },
     {
+      key: 'orders',
       label: 'Orders',
-      icon: <MdExpandMore />,
+      icon: <FaTasks className="w-5 h-5" />,
       allowedRoles: ['admin', 'manager'],
       children: [
-        { label: 'All Orders', path: '/orders' },
-        { label: 'Create Order', path: '/orders/create' },
+        { key: 'all-orders', label: 'All Orders', path: '/app/orders' },
+        { key: 'create-order', label: 'Create Order', path: '/app/orders/create' },
       ],
     },
     {
-      label: 'Dashboard & Reports',
-      icon: <FaChartLine />,
+      key: 'reports',
+      label: 'Reports & Analytics',
+      icon: <FaChartLine className="w-5 h-5" />,
       allowedRoles: ['admin', 'manager', 'employee'],
       children: [
-        { label: 'Main Dashboard', path: '/dashboard' },
-        { label: 'Yearly Outcome', path: '/reports/yearly' },
+        { key: 'main-dashboard', label: 'Main Dashboard', path: '/app/dashboard' },
+        { key: 'yearly-outcome', label: 'Yearly Outcome', path: '/app/reports/yearly' },
       ],
     },
     {
+      key: 'notifications',
       label: 'Notifications',
-      icon: <FaBell />,
+      icon: <FaBell className="w-5 h-5" />,
       allowedRoles: ['admin', 'manager'],
       children: [
-        { label: 'Alerts', path: '/notifications/alerts' },
-        { label: 'Reminders', path: '/notifications/reminders' },
+        { key: 'alerts', label: 'Alerts', path: '/app/notifications/alerts' },
+        { key: 'reminders', label: 'Reminders', path: '/app/notifications/reminders' },
       ],
     },
     {
-      label: 'Maintenance Logs',
-      icon: <FaWrench />,
+      key: 'maintenance',
+      label: 'Maintenance',
+      icon: <FaWrench className="w-5 h-5" />,
       allowedRoles: ['admin', 'manager'],
       children: [
-        { label: 'Service Logs', path: '/maintenance/logs' },
-        { label: 'Upcoming Services', path: '/maintenance/upcoming' },
+        { key: 'service-logs', label: 'Service Logs', path: '/app/maintenance/logs' },
+        { key: 'upcoming-services', label: 'Upcoming Services', path: '/app/maintenance/upcoming' },
       ],
     },
   ];
@@ -160,77 +241,269 @@ const SidebarMenu = ({ collapsed }) => {
     (item) => !item.allowedRoles || item.allowedRoles.includes(user?.role)
   );
 
-  const itemClass = (index) => `
-    text-sm font-medium px-2 py-2 transition duration-150 ease-in-out rounded-md
-    ${isDark
-      ? openIndex === index
-        ? 'bg-cyan-950 text-white hover:bg-cyan-950 hover:text-black focus:text-black rounded-md'
-        : 'bg-transparent text-white hover:bg-cyan-950 hover:text-black focus:text-black rounded-md'
-      : openIndex === index
-        ? 'bg-white text-Black hover:bg-gray-100 hover:text-cyan-950 focus:text-cyan-950 rounded-md'
-        : 'bg-transparent text-cyan-950 hover:bg-gray-100 hover:text-black focus:text-black rounded-md'
-    }
-  `;
+  const isActive = (path) => activePath === path;
 
-  const subItemClass = `
-    text-sm px-5 pl-6 py-1 transition duration-150 ease-in-out rounded-md
-    ${isDark
-      ? 'bg-cyan-950 text-cyan-950 hover:bg-white hover:text-cyan-950 focus:text-cyan-950 rounded-md'
-      : 'bg-white text-cyan-950 hover:bg-gray-100 hover:text-black focus:text-black rounded-md'
+  // Menu item classes - REMOVED unused isSubmenu parameter
+  const menuItemClass = (isActive) => {
+    const baseClasses = "transition-all duration-300 font-medium rounded-lg mx-2 my-1";
+    
+    if (isActive) {
+      return `${baseClasses} ${
+        isDark 
+          ? 'bg-orange-600 text-black shadow-lg' 
+          : 'bg-orange-500 text-white shadow-md'
+      }`;
     }
-  `;
+    
+    return `${baseClasses} ${
+      isDark 
+        ? 'text-white' 
+        : 'text-black'
+    }`;
+  };
 
-  const sidebarBg = isDark ? 'bg-cyan-950' : 'bg-white';
+  // Submenu item classes
+  const subMenuItemClass = (isActive) => {
+    const baseClasses = "transition-all duration-300 text-sm rounded-lg mx-2 my-1 pl-8 pr-3 py-2";
+    
+    if (isActive) {
+      return `${baseClasses} ${
+        isDark 
+          ? 'bg-orange-600 text-white border-l-4 border-orange-400 shadow-inner font-semibold' 
+          : 'bg-orange-500 text-black border-l-4 border-orange-600 shadow-sm font-semibold'
+      }`;
+    }
+    
+    return `${baseClasses} ${
+      isDark 
+        ? 'text-black' 
+        : 'text-black'
+    }`;
+  };
+
+  // Submenu icon
+  const getSubmenuIcon = (isActive, isDark) => {
+    if (isActive) {
+      return isDark 
+        ? <FaDotCircle className="w-3 h-3 text-white" />
+        : <FaDotCircle className="w-3 h-3 text-white" />;
+    }
+    return isDark 
+      ? <FaRegCircle className="w-2.5 h-2.5 text-black" />
+      : <FaRegCircle className="w-2.5 h-2.5 text-black" />;
+  };
+
+  const sidebarBg = isDark 
+    ? 'bg-gradient-to-b from-gray-900 via-gray-800 to-gray-800 text-black ' 
+    : 'bg-gradient-to-b from-white via-gray-50 to-white ';
+
+  const UserProfile = () => (
+    <div className={`p-4 border-b sticky top-0 z-10 ${
+      isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-white'
+    }`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className="relative">
+            <FaUserCircle className={`w-10 h-10 ${isDark ? 'text-orange-400' : 'text-orange-500'}`} />
+            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+          </div>
+          {!collapsed && (
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-semibold truncate ${
+                isDark ? 'text-white' : 'text-gray-900'
+              }`}>
+                {user?.name || 'User'}
+              </p>
+              <p className={`text-xs truncate capitalize ${
+                isDark ? 'text-orange-300' : 'text-orange-600'
+              }`}>
+                {user?.role || 'Role'}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  // EnhancedSubMenu
+  const EnhancedSubMenu = ({ item }) => {
+    const hasActiveChild = item.children?.some(child => isActive(child.path));
+    const isMenuOpen = openMenus[item.key];
+    
+    if (collapsed) {
+      return (
+        <MenuItem
+          key={item.key}
+          icon={item.icon}
+          className={menuItemClass(hasActiveChild)}
+        >
+          {/* Empty content when collapsed */}
+        </MenuItem>
+      );
+    }
+
+    return (
+      <SubMenu
+        key={item.key}
+        label={item.label}
+        icon={item.icon}
+        className={`
+          transition-all duration-300 font-medium rounded-lg mx-2 my-1
+          ${isMenuOpen 
+            ? (isDark 
+                ? 'bg-orange-500 text-white hover:text-black border-l-4 border-orange-500' 
+                : 'bg-orange-500 text-black border-l-4 border-orange-500'
+              )
+            : (hasActiveChild
+                ? (isDark 
+                    ? 'bg-orange-600 text-white ' 
+                    : 'bg-orange-600 text-black '
+                  )
+                : (isDark 
+                    ? 'text-white hover:text-black ' 
+                    : 'text-black '
+                  )
+              )
+          }
+        `}
+        open={isMenuOpen}
+        onOpenChange={() => handleToggle(item.key)}
+      >
+        {item.children.map((child) => {
+          const childIsActive = isActive(child.path);
+          return (
+            <MenuItem
+              key={child.key}
+              component={<Link to={child.path} />}
+              className={subMenuItemClass(childIsActive)}
+              active={childIsActive}
+              icon={getSubmenuIcon(childIsActive, isDark)}
+            >
+              {child.label}
+            </MenuItem>
+          );
+        })}
+      </SubMenu>
+    );
+  };
+
+  const renderMenuItem = (item, level = 0) => {
+    if (level > 1) return null;
+
+    if (item.path) {
+      return (
+        <MenuItem
+          key={item.key}
+          icon={level === 0 ? item.icon : <FaRegCircle className="w-3 h-3" />}
+          component={<Link to={item.path} />}
+          // REMOVED the second parameter since it's no longer used
+          className={menuItemClass(isActive(item.path))}
+          active={isActive(item.path)}
+        >
+          {!collapsed && item.label}
+        </MenuItem>
+      );
+    }
+
+    if (item.children && level === 0) {
+      return <EnhancedSubMenu key={item.key} item={item} />;
+    }
+
+    return null;
+  };
 
   return (
-    <Sidebar collapsed={collapsed} className={`h-full absolute m-0 border-r-0 top-16 mb-12 pb-12 bottom-12 bg-transparent ${sidebarBg}`}>
-      <Menu className={`h-230 ${sidebarBg}`}>
-        <div className="p-4">
-          Welcome
+    <div className="h-screen flex flex-col">
+      <Sidebar 
+        collapsed={collapsed} 
+        className={`h-full border-0 ${sidebarBg} shadow-2xl relative flex flex-col hover:bg-`}
+        rootStyles={{
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+        width="280px"
+        collapsedWidth="80px"
+      >
+        {/* Fixed User Profile Section */}
+        <div className="flex-shrink-0">
+          <UserProfile />
         </div>
-        {accessibleItems.map((item, i) =>
-          collapsed ? (
-            <MenuItem
-              key={i}
-              icon={item.icon}
-              className={itemClass(i)}
-              title={item.label}
-            />
-          ) : (
-            <SubMenu
-              key={i}
-              label={item.label}
-              icon={item.icon}
-              className={itemClass(i)}
-              onOpenChange={() => handleToggle(i)}
-              open={openIndex === i}
-            >
-              {item.children.map((child, j) => (
-                <MenuItem
-                  key={j}
-                  component={<Link to={child.path} />}
-                  className={`${subItemClass} bg-transparent rounded-md`}
-                >
-                  {child.label}
-                </MenuItem>
-              ))}
-            </SubMenu>
-          )
-        )}
-      </Menu>
-    </Sidebar>
+
+        {/* Scrollable Navigation Items */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <Menu 
+            className={`${sidebarBg} flex-1 overflow-hidden list-none`}
+            menuItemStyles={{
+              button: ({ level }) => ({
+                padding: level === 0 ? '12px 16px' : '8px 12px',
+                margin: level === 0 ? '2px 8px' : '1px 8px',
+                borderRadius: '4px',
+                
+              }),
+            }}
+          >
+            {/* Navigation Items Container with Scroll */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-200px)] custom-scrollbar list-none">
+              {accessibleItems.map((item) => renderMenuItem(item))}
+            </div>
+
+            {/* Fixed Footer Actions */}
+            <div className={`border-t flex-shrink-0 list-none mb-8 ${
+              isDark ? 'border-gray-700' : 'border-gray-200'
+            }`}>
+              <MenuItem
+                icon={<FaCog className="w-5 h-5" />}
+                component={<Link to="/app/settings" />}
+                className={menuItemClass(isActive('/app/settings'))}
+                active={isActive('/app/settings')}
+              >
+                {!collapsed && 'Settings'}
+              </MenuItem>
+              <MenuItem
+                icon={<FaSignOutAlt className="w-5 h-5" />}
+                onClick={handleLogout}
+                className={`mx-2 my-1 rounded-lg transition-all duration-300 font-medium ${
+                  isDark 
+                    ? 'text-white' 
+                    : 'text-black'
+                }`}
+              >
+                {!collapsed && 'Logout'}
+              </MenuItem>
+            </div>
+          </Menu>
+        </div>
+      </Sidebar>
+
+      {/* Custom scrollbar styles */}
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: ${isDark ? '#374151' : '#f3f4f6'};
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: ${isDark ? '#f97316' : '#ea580c'};
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: ${isDark ? '#ea580c' : '#c2410c'};
+        }
+      `}</style>
+    </div>
   );
 };
 
-const SidebarWrapper = ({ collapsed }) => {
+const SidebarWrapper = ({ collapsed, onToggle }) => {
   const { theme } = useTheme();
-  const wrapperClass = theme === 'dark'
-    ? 'bg-cyan-950 text-white m-0 border-r-3 border-r-orange-700 m-0'
-    : 'bg-white text-black m-0 border-r-3 border-r-orange-700 m-0';
-
+  
   return (
-    <div className={`h-screen m-0 border-r-0 ${wrapperClass}`}>
-      <SidebarMenu collapsed={collapsed} />
+    <div className="h-screen flex-shrink-0 sticky top-0">
+      <SidebarMenu collapsed={collapsed} onToggle={onToggle} />
     </div>
   );
 };

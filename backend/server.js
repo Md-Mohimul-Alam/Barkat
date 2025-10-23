@@ -5,6 +5,7 @@ const cors = require('cors');
 const { sequelize } = require('./models'); // make sure this exports { sequelize }
 const authRoutes = require('./routes/auth');
 const branchRoutes = require('./routes/branchRoutes');
+const clientRoute = require('./routes/clientRoute');
 const transportRoutes = require('./routes/transportRoutes');
 const { authenticate, authorizeRoles } = require('./middlewares/auth');
 
@@ -24,6 +25,7 @@ app.use(express.json());
 // ✅ Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/branches', branchRoutes);
+app.use('/api/clients', clientRoute);
 app.use('/api/transport', transportRoutes);
 
 // ✅ Protected test routes

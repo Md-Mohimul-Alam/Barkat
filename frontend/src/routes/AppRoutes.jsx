@@ -19,10 +19,13 @@ import CNFForm from '../components/cnf/CNFForm';
 import CNFList from '../components/cnf/CNFList';
 import LoadingPointForm from '../components/loading/LoadingPointForm';
 import LoadingPointList from '../components/loading/LoadingPointList';
+import UnloadingPointForm from '../components/unload/UnloadingPointForm';
+import UnloadingPointList from '../components/unload/UnloadingPointList';
 import DueCard from '../components/dues/DueCard'; // Assuming this is the correct path for DueCard component
 import DueForm from '../components/dues/DueForm';
 import DueList from '../components/dues/DueList';
 import CalculatorPage from '../components/Calculator/CalculatorPage'; // Assuming this is the correct path for the calculator page
+import Settings from '../pages/Settings';
 
 import BankForm from '../components/banks/BankForm';
 import Statements from '../components/banks/statements';
@@ -66,6 +69,10 @@ const AppRoutes = () => {
       <Route path='/app/banks/transactions/list' element={<BankTransactionView />} />
       <Route path="/app/loading-points/add" element={<LoadingPointForm />} />
       <Route path="/app/loading-points/list" element={<LoadingPointList />} />
+      <Route path="/app/unloading-points/add" element={<UnloadingPointForm />} />
+      <Route path="/app/unloading-points/list" element={<UnloadingPointList />} />
+      <Route path="/app/settings" element={<Settings />} />
+
 
       <Route path="/app/calculator/CalculatorPage" element={<CalculatorPage />} />
       
