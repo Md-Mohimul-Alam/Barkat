@@ -1,6 +1,7 @@
-const Employee = require('../models/Employee');
-const Branch = require('../models/Branch');
+// controllers/employeeController.js
+const { Employee, Branch } = require('../models');
 const { validationResult } = require('express-validator');
+const { Op } = require('sequelize');
 
 // @desc    Get all employees with advanced filtering and pagination
 // @route   GET /api/employees
@@ -19,65 +20,69 @@ const getAllEmployees = async (req, res) => {
       joinDateFrom,
       joinDateTo,
       sortBy = 'createdAt',
-      sortOrder = 'desc'
+      sortOrder = 'DESC'
     } = req.query;
 
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
-    const skip = (pageNum - 1) * limitNum;
+    const offset = (pageNum - 1) * limitNum;
 
-    // Build filter object
-    let filter = {};
+    // Build where conditions for Sequelize
+    let where = {};
     
     // Search across multiple fields
     if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { contact: { $regex: search, $options: 'i' } },
-        { nid: { $regex: search, $options: 'i' } },
-        { position: { $regex: search, $options: 'i' } },
-        { address: { $regex: search, $options: 'i' } }
+      where[Op.or] = [
+        { name: { [Op.iLike]: `%${search}%` } },
+        { email: { [Op.iLike]: `%${search}%` } },
+        { contact: { [Op.iLike]: `%${search}%` } },
+        { nid: { [Op.iLike]: `%${search}%` } },
+        { position: { [Op.iLike]: `%${search}%` } },
+        { address: { [Op.iLike]: `%${search}%` } },
       ];
     }
 
     // Filter by branch
-    if (branch) filter.branchId = branch;
+    if (branch) where.branchId = branch;
 
     // Filter by position
-    if (position) filter.position = { $regex: position, $options: 'i' };
+    if (position) where.position = { [Op.iLike]: `%${position}%` };
 
     // Filter by status
-    if (status) filter.status = status;
+    if (status) where.status = status;
 
     // Filter by salary range
     if (minSalary || maxSalary) {
-      filter.salary = {};
-      if (minSalary) filter.salary.$gte = parseFloat(minSalary);
-      if (maxSalary) filter.salary.$lte = parseFloat(maxSalary);
+      where.salary = {};
+      if (minSalary) where.salary[Op.gte] = parseFloat(minSalary);
+      if (maxSalary) where.salary[Op.lte] = parseFloat(maxSalary);
     }
 
     // Filter by join date range
     if (joinDateFrom || joinDateTo) {
-      filter.joinedAt = {};
-      if (joinDateFrom) filter.joinedAt.$gte = new Date(joinDateFrom);
-      if (joinDateTo) filter.joinedAt.$lte = new Date(joinDateTo);
+      where.joinedAt = {};
+      if (joinDateFrom) where.joinedAt[Op.gte] = new Date(joinDateFrom);
+      if (joinDateTo) where.joinedAt[Op.lte] = new Date(joinDateTo);
     }
 
-    // Get employees with population and sorting
-    const employees = await Employee.find(filter)
-      .populate('branchId', 'name location contact address')
-      .sort({ [sortBy]: sortOrder === 'desc' ? -1 : 1 })
-      .skip(skip)
-      .limit(limitNum);
+    // Get employees with association and sorting using Sequelize
+    const { count, rows: employees } = await Employee.findAndCountAll({
+      where,
+      include: [{
+        model: Branch,
+        as: 'branch',
+        attributes: ['id', 'name', 'contact', 'address'] 
+      }],
+      order: [[sortBy, sortOrder.toUpperCase()]],
+      limit: limitNum,
+      offset: offset
+    });
 
-    // Get total count for pagination
-    const total = await Employee.countDocuments(filter);
-    const totalPages = Math.ceil(total / limitNum);
+    const totalPages = Math.ceil(count / limitNum);
 
     // Transform data for frontend
     const transformedEmployees = employees.map(employee => ({
-      id: employee._id,
+      id: employee.id,
       name: employee.name,
       position: employee.position,
       contact: employee.contact,
@@ -89,12 +94,10 @@ const getAllEmployees = async (req, res) => {
       salary: employee.salary,
       joinedAt: employee.joinedAt,
       status: employee.status,
-      branchId: employee.branchId?._id,
-      branchName: employee.branchId?.name,
-      branchLocation: employee.branchId?.location,
+      branchId: employee.branch?.id,
+      branchName: employee.branch?.name,
       createdAt: employee.createdAt,
       updatedAt: employee.updatedAt,
-      // Calculate age from DOB
       age: calculateAge(employee.dob)
     }));
 
@@ -105,20 +108,10 @@ const getAllEmployees = async (req, res) => {
       pagination: {
         currentPage: pageNum,
         totalPages,
-        totalEmployees: total,
+        totalEmployees: count,
         hasNext: pageNum < totalPages,
         hasPrev: pageNum > 1,
         pageSize: limitNum
-      },
-      filters: {
-        search,
-        branch,
-        position,
-        status,
-        minSalary,
-        maxSalary,
-        joinDateFrom,
-        joinDateTo
       }
     });
   } catch (error) {
@@ -145,8 +138,13 @@ const getEmployeeById = async (req, res) => {
       });
     }
 
-    const employee = await Employee.findById(id)
-      .populate('branchId', 'name location contact address establishedAt');
+    const employee = await Employee.findByPk(id, {
+      include: [{
+        model: Branch,
+        as: 'branch',
+        attributes: ['id', 'name', 'contact', 'address', 'establishedAt']
+      }]
+    });
 
     if (!employee) {
       return res.status(404).json({
@@ -157,7 +155,7 @@ const getEmployeeById = async (req, res) => {
 
     // Transform employee data
     const transformedEmployee = {
-      id: employee._id,
+      id: employee.id,
       name: employee.name,
       position: employee.position,
       contact: employee.contact,
@@ -169,10 +167,9 @@ const getEmployeeById = async (req, res) => {
       salary: employee.salary,
       joinedAt: employee.joinedAt,
       status: employee.status,
-      branchId: employee.branchId?._id,
-      branchName: employee.branchId?.name,
-      branchLocation: employee.branchId?.location,
-      branchContact: employee.branchId?.contact,
+      branchId: employee.branch?.id,
+      branchName: employee.branch?.name,
+      branchContact: employee.branch?.contact,
       createdAt: employee.createdAt,
       updatedAt: employee.updatedAt,
       age: calculateAge(employee.dob),
@@ -186,14 +183,6 @@ const getEmployeeById = async (req, res) => {
     });
   } catch (error) {
     console.error('Get employee by ID error:', error);
-    
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid employee ID format'
-      });
-    }
-
     res.status(500).json({
       success: false,
       message: 'Server error while fetching employee',
@@ -233,7 +222,7 @@ const createEmployee = async (req, res) => {
     } = req.body;
 
     // Check if branch exists
-    const branch = await Branch.findById(branchId);
+    const branch = await Branch.findByPk(branchId);
     if (!branch) {
       return res.status(400).json({
         success: false,
@@ -242,7 +231,7 @@ const createEmployee = async (req, res) => {
     }
 
     // Check if employee with same email already exists
-    const existingEmail = await Employee.findOne({ email });
+    const existingEmail = await Employee.findOne({ where: { email } });
     if (existingEmail) {
       return res.status(409).json({
         success: false,
@@ -251,7 +240,7 @@ const createEmployee = async (req, res) => {
     }
 
     // Check if employee with same NID already exists
-    const existingNID = await Employee.findOne({ nid });
+    const existingNID = await Employee.findOne({ where: { nid } });
     if (existingNID) {
       return res.status(409).json({
         success: false,
@@ -290,11 +279,11 @@ const createEmployee = async (req, res) => {
     }
 
     // Create new employee
-    const employee = new Employee({
+    const employee = await Employee.create({
       name: name.trim(),
       position: position.trim(),
       contact: contact.trim(),
-      whatsapp: whatsapp ? whatsapp.trim() : undefined,
+      whatsapp: whatsapp ? whatsapp.trim() : null,
       email: email.trim().toLowerCase(),
       nid: nid.trim(),
       dob: dobDate,
@@ -305,12 +294,18 @@ const createEmployee = async (req, res) => {
       status
     });
 
-    const savedEmployee = await employee.save();
-    await savedEmployee.populate('branchId', 'name location contact address');
+    // Reload with branch association
+    const savedEmployee = await Employee.findByPk(employee.id, {
+      include: [{
+        model: Branch,
+        as: 'branch',
+        attributes: ['id', 'name', 'contact', 'address']
+      }]
+    });
 
     // Transform response
     const transformedEmployee = {
-      id: savedEmployee._id,
+      id: savedEmployee.id,
       name: savedEmployee.name,
       position: savedEmployee.position,
       contact: savedEmployee.contact,
@@ -322,9 +317,8 @@ const createEmployee = async (req, res) => {
       salary: savedEmployee.salary,
       joinedAt: savedEmployee.joinedAt,
       status: savedEmployee.status,
-      branchId: savedEmployee.branchId?._id,
-      branchName: savedEmployee.branchId?.name,
-      branchLocation: savedEmployee.branchId?.location,
+      branchId: savedEmployee.branch?.id,
+      branchName: savedEmployee.branch?.name,
       createdAt: savedEmployee.createdAt,
       updatedAt: savedEmployee.updatedAt,
       age: calculateAge(savedEmployee.dob)
@@ -338,8 +332,9 @@ const createEmployee = async (req, res) => {
   } catch (error) {
     console.error('Create employee error:', error);
     
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
+    // Handle Sequelize validation errors
+    if (error.name === 'SequelizeValidationError') {
+      const errors = error.errors.map(err => err.message);
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
@@ -347,8 +342,9 @@ const createEmployee = async (req, res) => {
       });
     }
 
-    if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern)[0];
+    // Handle Sequelize unique constraint errors
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      const field = error.errors[0]?.path;
       return res.status(409).json({
         success: false,
         message: `Employee with this ${field} already exists`
@@ -389,7 +385,7 @@ const updateEmployee = async (req, res) => {
     }
 
     // Check if employee exists
-    const existingEmployee = await Employee.findById(id);
+    const existingEmployee = await Employee.findByPk(id);
     if (!existingEmployee) {
       return res.status(404).json({
         success: false,
@@ -398,8 +394,8 @@ const updateEmployee = async (req, res) => {
     }
 
     // If branchId is being updated, validate the new branch
-    if (updateData.branchId && updateData.branchId !== existingEmployee.branchId.toString()) {
-      const branch = await Branch.findById(updateData.branchId);
+    if (updateData.branchId && updateData.branchId !== existingEmployee.branchId) {
+      const branch = await Branch.findByPk(updateData.branchId);
       if (!branch) {
         return res.status(400).json({
           success: false,
@@ -411,8 +407,10 @@ const updateEmployee = async (req, res) => {
     // Check for duplicate email (excluding current employee)
     if (updateData.email && updateData.email !== existingEmployee.email) {
       const duplicateEmployee = await Employee.findOne({ 
-        email: updateData.email.toLowerCase(),
-        _id: { $ne: id }
+        where: { 
+          email: updateData.email.toLowerCase(),
+          id: { [Op.ne]: id }
+        }
       });
       if (duplicateEmployee) {
         return res.status(409).json({
@@ -426,8 +424,10 @@ const updateEmployee = async (req, res) => {
     // Check for duplicate NID (excluding current employee)
     if (updateData.nid && updateData.nid !== existingEmployee.nid) {
       const duplicateNID = await Employee.findOne({ 
-        nid: updateData.nid,
-        _id: { $ne: id }
+        where: { 
+          nid: updateData.nid,
+          id: { [Op.ne]: id }
+        }
       });
       if (duplicateNID) {
         return res.status(409).json({
@@ -482,18 +482,24 @@ const updateEmployee = async (req, res) => {
       updateData.salary = parseFloat(updateData.salary);
     }
 
-    const updatedEmployee = await Employee.findByIdAndUpdate(
-      id,
-      updateData,
-      { 
-        new: true, 
-        runValidators: true 
-      }
-    ).populate('branchId', 'name location contact address');
+    // Update employee
+    await Employee.update(updateData, {
+      where: { id },
+      individualHooks: true
+    });
+
+    // Get updated employee with branch
+    const updatedEmployee = await Employee.findByPk(id, {
+      include: [{
+        model: Branch,
+        as: 'branch',
+        attributes: ['id', 'name', 'contact', 'address']
+      }]
+    });
 
     // Transform response
     const transformedEmployee = {
-      id: updatedEmployee._id,
+      id: updatedEmployee.id,
       name: updatedEmployee.name,
       position: updatedEmployee.position,
       contact: updatedEmployee.contact,
@@ -505,9 +511,8 @@ const updateEmployee = async (req, res) => {
       salary: updatedEmployee.salary,
       joinedAt: updatedEmployee.joinedAt,
       status: updatedEmployee.status,
-      branchId: updatedEmployee.branchId?._id,
-      branchName: updatedEmployee.branchId?.name,
-      branchLocation: updatedEmployee.branchId?.location,
+      branchId: updatedEmployee.branch?.id,
+      branchName: updatedEmployee.branch?.name,
       createdAt: updatedEmployee.createdAt,
       updatedAt: updatedEmployee.updatedAt,
       age: calculateAge(updatedEmployee.dob),
@@ -522,15 +527,9 @@ const updateEmployee = async (req, res) => {
   } catch (error) {
     console.error('Update employee error:', error);
     
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid employee ID format'
-      });
-    }
-
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
+    // Handle Sequelize validation errors
+    if (error.name === 'SequelizeValidationError') {
+      const errors = error.errors.map(err => err.message);
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
@@ -538,8 +537,9 @@ const updateEmployee = async (req, res) => {
       });
     }
 
-    if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern)[0];
+    // Handle Sequelize unique constraint errors
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      const field = error.errors[0]?.path;
       return res.status(409).json({
         success: false,
         message: `Another employee with this ${field} already exists`
@@ -568,7 +568,7 @@ const deleteEmployee = async (req, res) => {
       });
     }
 
-    const employee = await Employee.findById(id);
+    const employee = await Employee.findByPk(id);
     
     if (!employee) {
       return res.status(404).json({
@@ -577,457 +577,22 @@ const deleteEmployee = async (req, res) => {
       });
     }
 
-    await Employee.findByIdAndDelete(id);
+    await Employee.destroy({ where: { id } });
     
     res.status(200).json({
       success: true,
       message: 'Employee deleted successfully',
       data: {
-        id: employee._id,
+        id: employee.id,
         name: employee.name,
         email: employee.email
       }
     });
   } catch (error) {
     console.error('Delete employee error:', error);
-    
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid employee ID format'
-      });
-    }
-
     res.status(500).json({
       success: false,
       message: 'Server error while deleting employee',
-      error: process.env.NODE_ENV === 'production' ? null : error.message
-    });
-  }
-};
-
-// @desc    Get employees by branch
-// @route   GET /api/employees/branch/:branchId
-// @access  Private
-const getEmployeesByBranch = async (req, res) => {
-  try {
-    const { branchId } = req.params;
-    const { status, position, sortBy = 'name', sortOrder = 'asc' } = req.query;
-
-    if (!branchId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Branch ID is required'
-      });
-    }
-
-    // Validate branch exists
-    const branch = await Branch.findById(branchId);
-    if (!branch) {
-      return res.status(404).json({
-        success: false,
-        message: 'Branch not found'
-      });
-    }
-
-    // Build filter
-    let filter = { branchId };
-    if (status) filter.status = status;
-    if (position) filter.position = { $regex: position, $options: 'i' };
-
-    const employees = await Employee.find(filter)
-      .populate('branchId', 'name location')
-      .sort({ [sortBy]: sortOrder === 'desc' ? -1 : 1 });
-
-    // Transform data
-    const transformedEmployees = employees.map(employee => ({
-      id: employee._id,
-      name: employee.name,
-      position: employee.position,
-      contact: employee.contact,
-      email: employee.email,
-      nid: employee.nid,
-      dob: employee.dob,
-      salary: employee.salary,
-      joinedAt: employee.joinedAt,
-      status: employee.status,
-      branchId: employee.branchId?._id,
-      branchName: employee.branchId?.name,
-      age: calculateAge(employee.dob),
-      employmentDuration: calculateEmploymentDuration(employee.joinedAt)
-    }));
-
-    res.status(200).json({
-      success: true,
-      message: `Employees for branch "${branch.name}" fetched successfully`,
-      data: transformedEmployees,
-      branch: {
-        id: branch._id,
-        name: branch.name,
-        location: branch.location,
-        totalEmployees: employees.length
-      }
-    });
-  } catch (error) {
-    console.error('Get employees by branch error:', error);
-    
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid branch ID format'
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching employees by branch',
-      error: process.env.NODE_ENV === 'production' ? null : error.message
-    });
-  }
-};
-
-// @desc    Search employees
-// @route   GET /api/employees/search
-// @access  Private
-const searchEmployees = async (req, res) => {
-  try {
-    const { query, limit = 20, fields } = req.query;
-
-    if (!query || query.trim() === '') {
-      return res.status(400).json({
-        success: false,
-        message: 'Search query is required'
-      });
-    }
-
-    const searchQuery = query.trim();
-    const limitNum = parseInt(limit);
-
-    // Determine which fields to search
-    const searchFields = fields ? fields.split(',') : ['name', 'email', 'contact', 'nid', 'position'];
-
-    // Build search conditions
-    const searchConditions = searchFields.map(field => ({
-      [field]: { $regex: searchQuery, $options: 'i' }
-    }));
-
-    const employees = await Employee.find({
-      $or: searchConditions
-    })
-    .populate('branchId', 'name location')
-    .limit(limitNum)
-    .select('name email contact position branchId status dob joinedAt salary');
-
-    // Transform data
-    const transformedEmployees = employees.map(employee => ({
-      id: employee._id,
-      name: employee.name,
-      email: employee.email,
-      contact: employee.contact,
-      position: employee.position,
-      salary: employee.salary,
-      status: employee.status,
-      dob: employee.dob,
-      joinedAt: employee.joinedAt,
-      branchId: employee.branchId?._id,
-      branchName: employee.branchId?.name,
-      age: calculateAge(employee.dob),
-      employmentDuration: calculateEmploymentDuration(employee.joinedAt)
-    }));
-
-    res.status(200).json({
-      success: true,
-      message: 'Employees search completed successfully',
-      data: transformedEmployees,
-      search: {
-        query: searchQuery,
-        fields: searchFields,
-        totalResults: employees.length,
-        limit: limitNum
-      }
-    });
-  } catch (error) {
-    console.error('Search employees error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while searching employees',
-      error: process.env.NODE_ENV === 'production' ? null : error.message
-    });
-  }
-};
-
-// @desc    Get employee statistics
-// @route   GET /api/employees/stats
-// @access  Private
-const getEmployeeStats = async (req, res) => {
-  try {
-    // Basic counts
-    const totalEmployees = await Employee.countDocuments();
-    const activeEmployees = await Employee.countDocuments({ status: 'active' });
-    const inactiveEmployees = await Employee.countDocuments({ status: 'inactive' });
-    const onLeaveEmployees = await Employee.countDocuments({ status: 'on-leave' });
-
-    // Employees by position
-    const employeesByPosition = await Employee.aggregate([
-      {
-        $group: {
-          _id: '$position',
-          count: { $sum: 1 },
-          avgSalary: { $avg: '$salary' },
-          minSalary: { $min: '$salary' },
-          maxSalary: { $max: '$salary' }
-        }
-      },
-      { $sort: { count: -1 } }
-    ]);
-
-    // Employees by branch
-    const employeesByBranch = await Employee.aggregate([
-      {
-        $lookup: {
-          from: 'branches',
-          localField: 'branchId',
-          foreignField: '_id',
-          as: 'branch'
-        }
-      },
-      {
-        $unwind: '$branch'
-      },
-      {
-        $group: {
-          _id: '$branch.name',
-          branchId: { $first: '$branch._id' },
-          count: { $sum: 1 },
-          location: { $first: '$branch.location' }
-        }
-      },
-      { $sort: { count: -1 } }
-    ]);
-
-    // Salary statistics
-    const salaryStats = await Employee.aggregate([
-      {
-        $group: {
-          _id: null,
-          avgSalary: { $avg: '$salary' },
-          minSalary: { $min: '$salary' },
-          maxSalary: { $max: '$salary' },
-          totalSalary: { $sum: '$salary' }
-        }
-      }
-    ]);
-
-    // Employees by join date (last 12 months)
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-
-    const employeesByMonth = await Employee.aggregate([
-      {
-        $match: {
-          joinedAt: { $gte: oneYearAgo }
-        }
-      },
-      {
-        $group: {
-          _id: {
-            year: { $year: '$joinedAt' },
-            month: { $month: '$joinedAt' }
-          },
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { '_id.year': 1, '_id.month': 1 }
-      }
-    ]);
-
-    // Age distribution
-    const ageDistribution = await Employee.aggregate([
-      {
-        $addFields: {
-          age: {
-            $floor: {
-              $divide: [
-                { $subtract: [new Date(), '$dob'] },
-                31557600000 // milliseconds in a year
-              ]
-            }
-          }
-        }
-      },
-      {
-        $bucket: {
-          groupBy: '$age',
-          boundaries: [18, 25, 35, 45, 55, 65, 100],
-          default: '65+',
-          output: {
-            count: { $sum: 1 }
-          }
-        }
-      }
-    ]);
-
-    res.status(200).json({
-      success: true,
-      message: 'Employee statistics fetched successfully',
-      data: {
-        overview: {
-          total: totalEmployees,
-          active: activeEmployees,
-          inactive: inactiveEmployees,
-          onLeave: onLeaveEmployees
-        },
-        byPosition: employeesByPosition,
-        byBranch: employeesByBranch,
-        salary: salaryStats[0] || { avgSalary: 0, minSalary: 0, maxSalary: 0, totalSalary: 0 },
-        recentHires: employeesByMonth,
-        ageDistribution,
-        summary: {
-          activePercentage: totalEmployees > 0 ? ((activeEmployees / totalEmployees) * 100).toFixed(1) : 0,
-          avgEmployeesPerBranch: employeesByBranch.length > 0 ? (totalEmployees / employeesByBranch.length).toFixed(1) : 0
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Get employee stats error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching employee statistics',
-      error: process.env.NODE_ENV === 'production' ? null : error.message
-    });
-  }
-};
-
-// @desc    Bulk update employees
-// @route   PATCH /api/employees/bulk
-// @access  Private (Admin/Manager only)
-const bulkUpdateEmployees = async (req, res) => {
-  try {
-    const { employeeIds, updateData } = req.body;
-
-    if (!employeeIds || !Array.isArray(employeeIds) || employeeIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Employee IDs array is required'
-      });
-    }
-
-    if (!updateData || typeof updateData !== 'object' || Object.keys(updateData).length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Update data is required and cannot be empty'
-      });
-    }
-
-    // Validate all employee IDs exist
-    const existingEmployees = await Employee.find({ _id: { $in: employeeIds } });
-    if (existingEmployees.length !== employeeIds.length) {
-      const foundIds = existingEmployees.map(emp => emp._id.toString());
-      const missingIds = employeeIds.filter(id => !foundIds.includes(id));
-      
-      return res.status(404).json({
-        success: false,
-        message: 'Some employee IDs not found',
-        missingIds
-      });
-    }
-
-    // Perform bulk update
-    const result = await Employee.updateMany(
-      { _id: { $in: employeeIds } },
-      { $set: updateData },
-      { runValidators: true }
-    );
-
-    // Get updated employees
-    const updatedEmployees = await Employee.find({ _id: { $in: employeeIds } })
-      .populate('branchId', 'name')
-      .select('name email position status branchId');
-
-    res.status(200).json({
-      success: true,
-      message: `Successfully updated ${result.modifiedCount} employees`,
-      data: {
-        modifiedCount: result.modifiedCount,
-        updatedEmployees: updatedEmployees.map(emp => ({
-          id: emp._id,
-          name: emp.name,
-          email: emp.email,
-          position: emp.position,
-          status: emp.status,
-          branchName: emp.branchId?.name
-        }))
-      }
-    });
-  } catch (error) {
-    console.error('Bulk update employees error:', error);
-    
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed during bulk update',
-        errors
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: 'Server error while performing bulk update',
-      error: process.env.NODE_ENV === 'production' ? null : error.message
-    });
-  }
-};
-
-// @desc    Export employees data
-// @route   GET /api/employees/export
-// @access  Private (Admin/Manager only)
-const exportEmployees = async (req, res) => {
-  try {
-    const { format = 'json', filters = '{}' } = req.query;
-    
-    // Parse filters
-    let filter = {};
-    try {
-      filter = JSON.parse(filters);
-    } catch (e) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid filters format'
-      });
-    }
-
-    const employees = await Employee.find(filter)
-      .populate('branchId', 'name location')
-      .select('-__v');
-
-    if (format === 'csv') {
-      // Implement CSV export logic here
-      // This would generate and return a CSV file
-      res.status(200).json({
-        success: true,
-        message: 'CSV export would be implemented here',
-        data: employees
-      });
-    } else {
-      // JSON export
-      res.status(200).json({
-        success: true,
-        message: 'Employees data exported successfully',
-        data: employees,
-        export: {
-          format,
-          total: employees.length,
-          timestamp: new Date().toISOString()
-        }
-      });
-    }
-  } catch (error) {
-    console.error('Export employees error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while exporting employees data',
       error: process.env.NODE_ENV === 'production' ? null : error.message
     });
   }
@@ -1061,15 +626,100 @@ const calculateEmploymentDuration = (joinDate) => {
   return `${months} month${months > 1 ? 's' : ''}`;
 };
 
+// @desc    Bulk update employees
+// @route   PATCH /api/employees/bulk
+// @access  Private (Admin/Manager only)
+const bulkUpdateEmployees = async (req, res) => {
+  try {
+    const { employeeIds, updateData } = req.body;
+
+    if (!employeeIds || !Array.isArray(employeeIds) || employeeIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Employee IDs array is required'
+      });
+    }
+
+    if (!updateData || typeof updateData !== 'object' || Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Update data is required and cannot be empty'
+      });
+    }
+
+    // Validate all employee IDs exist
+    const existingEmployees = await Employee.findAll({ 
+      where: { id: { [Op.in]: employeeIds } } 
+    });
+    
+    if (existingEmployees.length !== employeeIds.length) {
+      const foundIds = existingEmployees.map(emp => emp.id);
+      const missingIds = employeeIds.filter(id => !foundIds.includes(id));
+      
+      return res.status(404).json({
+        success: false,
+        message: 'Some employee IDs not found',
+        missingIds
+      });
+    }
+
+    // Perform bulk update
+    const [affectedCount] = await Employee.update(updateData, {
+      where: { id: { [Op.in]: employeeIds } },
+      individualHooks: true
+    });
+
+    // Get updated employees
+    const updatedEmployees = await Employee.findAll({ 
+      where: { id: { [Op.in]: employeeIds } },
+      include: [{
+        model: Branch,
+        as: 'branch',
+        attributes: ['id', 'name']
+      }],
+      attributes: ['id', 'name', 'email', 'position', 'status'] 
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully updated ${affectedCount} employees`,
+      data: {
+        modifiedCount: affectedCount,
+        updatedEmployees: updatedEmployees.map(emp => ({
+          id: emp.id,
+          name: emp.name,
+          email: emp.email,
+          position: emp.position,
+          status: emp.status,
+          branchName: emp.branch?.name
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Bulk update employees error:', error);
+    
+    if (error.name === 'SequelizeValidationError') {
+      const errors = error.errors.map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed during bulk update',
+        errors
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error while performing bulk update',
+      error: process.env.NODE_ENV === 'production' ? null : error.message
+    });
+  }
+};
+
 module.exports = {
   getAllEmployees,
   getEmployeeById,
   createEmployee,
   updateEmployee,
   deleteEmployee,
-  getEmployeesByBranch,
-  searchEmployees,
-  getEmployeeStats,
-  bulkUpdateEmployees,
-  exportEmployees
+  bulkUpdateEmployees
 };

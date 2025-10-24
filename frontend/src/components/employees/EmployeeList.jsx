@@ -29,6 +29,34 @@ const EmployeeList = () => {
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewingEmployee, setViewingEmployee] = useState(null);
 
+  // Connection Status Component
+  const ConnectionStatus = () => {
+    const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+    useEffect(() => {
+      const handleOnline = () => setIsOnline(true);
+      const handleOffline = () => setIsOnline(false);
+
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
+    }, []);
+
+    if (!isOnline) {
+      return (
+        <div className="fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
+          ⚠️ You are offline. Please check your internet connection.
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   useEffect(() => {
     fetchEmployees();
     fetchBranches();
@@ -37,11 +65,30 @@ const EmployeeList = () => {
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const employeesData = await employeeService.getEmployees();
+      console.log('🔧 Starting to fetch employees...');
+      
+      const response = await employeeService.getEmployees();
+      console.log('✅ Employees data received:', response);
+      
+      // Extract the data array from the response
+      const employeesData = response.data || [];
+      console.log('📋 Extracted employees array:', employeesData);
+      
       setEmployees(employeesData);
     } catch (error) {
-      console.error('Failed to fetch employees:', error);
-      notifyError('Failed to load employees');
+      console.error('❌ Failed to fetch employees:', error);
+      
+      // Show specific error messages based on error type
+      if (error.message.includes('Cannot connect to server')) {
+        notifyError('Backend server is not running. Please start the server on port 5050.');
+      } else if (error.message.includes('session has expired')) {
+        notifyError('Your session has expired. Please login again.');
+        // Optional: Redirect to login after a delay
+        setTimeout(() => navigate('/login'), 2000);
+      } else {
+        notifyError(error.message || 'Failed to load employees');
+      }
+      
       setEmployees([]);
     } finally {
       setLoading(false);
@@ -206,6 +253,9 @@ const EmployeeList = () => {
         <TopBar onToggleSidebar={() => setSidebarCollapsed(prev => !prev)} sidebarCollapsed={sidebarCollapsed} />
 
         <div className="p-6 flex-1">
+          {/* Connection Status */}
+          <ConnectionStatus />
+
           {/* Header Section */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
             <div className="flex items-center">
@@ -304,8 +354,21 @@ const EmployeeList = () => {
                       onClick={() => handleSort('salary')}
                     >
                       <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                        <svg
+                          aria-hidden="true"
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="22"
+                          height="22"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#ff9500"
+                          strokeWidth="1"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M16.5 15.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+                          <path d="M7 7a2 2 0 1 1 4 0v9a3 3 0 0 0 6 0v-.5" />
+                          <path d="M8 11h6" />
                         </svg>
                         Salary
                         <SortIcon columnKey="salary" />
@@ -408,7 +471,25 @@ const EmployeeList = () => {
                           </span>
                         </td>
                         <td className="p-4 font-medium">
-                          ${employee.salary?.toLocaleString()}
+                          <div className="flex items-center">
+                            <svg
+                              aria-hidden="true"
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="22"
+                              height="22"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="#ff9500"
+                              strokeWidth="1"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M16.5 15.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+                              <path d="M7 7a2 2 0 1 1 4 0v9a3 3 0 0 0 6 0v-.5" />
+                              <path d="M8 11h6" />
+                            </svg>
+                            {employee.salary?.toLocaleString()}
+                          </div>
                         </td>
                         <td className="p-4">
                           {getStatusBadge(employee.status)}

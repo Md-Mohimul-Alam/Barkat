@@ -29,9 +29,13 @@ const apiRequest = async (endpoint, method = "GET", data = null) => {
   }
 
   try {
+    console.log(`🔧 API ${method} Request: ${BASE_URL}${endpoint}`);
+    
     const response = await fetch(`${BASE_URL}${endpoint}`, config);
+    
+    console.log(`🔧 API Response Status: ${response.status}`);
 
-    // Handle unauthorized responses more carefully
+    // Handle unauthorized responses
     if (response.status === 401) {
       console.warn('Authentication failed, redirecting to login');
       localStorage.removeItem('authToken');
@@ -49,7 +53,6 @@ const apiRequest = async (endpoint, method = "GET", data = null) => {
 
     const responseData = await response.json().catch(() => null);
     
-    // Return consistent structure
     return {
       success: true,
       data: responseData,
@@ -57,17 +60,19 @@ const apiRequest = async (endpoint, method = "GET", data = null) => {
     };
     
   } catch (error) {
-    console.error('API Request Error:', error);
+    console.error('❌ API Request Error:', error);
+    
+    // Handle network errors specifically
+    if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
+      throw new Error('Cannot connect to server. Please check if the backend is running on port 5050.');
+    }
     
     // Don't throw if it's already a redirect
     if (error.message.includes('Authentication failed')) {
       throw error;
     }
     
-    throw { 
-      message: error.message || 'API request failed',
-      status: error.status || 500
-    };
+    throw new Error(error.message || 'API request failed');
   }
 };
 

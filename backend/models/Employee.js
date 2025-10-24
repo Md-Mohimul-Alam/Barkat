@@ -93,7 +93,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.UUID,
       allowNull: false,
       references: {
-        model: 'branches', // ✅ FIXED: Changed from 'Branches' to 'branches'
+        model: 'branches',
         key: 'id'
       }
     },
@@ -160,5 +160,3 @@ module.exports = (sequelize, DataTypes) => {
 
   return Employee;
 };
-
-

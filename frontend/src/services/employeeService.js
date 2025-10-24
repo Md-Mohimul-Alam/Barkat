@@ -1,33 +1,65 @@
+// src/services/employeeService.js
 import api from './api';
 
 const employeeService = {
   // Get all employees with pagination and filters
   getEmployees: async (params = {}) => {
     try {
+      console.log('🔧 Fetching employees...');
       const response = await api.get('/employees', { params });
-      return response.data;
+      
+      // Handle different response formats
+      if (response && response.data) {
+        console.log('✅ Employees fetched successfully');
+        return response.data;
+      } else if (Array.isArray(response)) {
+        console.log('✅ Employees fetched successfully (direct array)');
+        return response;
+      } else {
+        console.warn('Unexpected employees response format:', response);
+        return [];
+      }
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch employees');
-    }
-  },
-
-  // Get employee by ID
-  getEmployeeById: async (id) => {
-    try {
-      const response = await api.get(`/employees/${id}`);
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch employee');
+      console.error('❌ Failed to fetch employees:', error);
+      
+      // Check if it's a network error
+      if (error.message.includes('Cannot connect to server')) {
+        throw new Error('Backend server is not running. Please start the server on port 5050.');
+      }
+      
+      // Check if it's an authentication error
+      if (error.message.includes('Authentication failed')) {
+        throw new Error('Your session has expired. Please login again.');
+      }
+      
+      throw new Error(error.message || 'Failed to fetch employees');
     }
   },
 
   // Create new employee
   createEmployee: async (employeeData) => {
     try {
+      console.log('🔧 Creating employee:', employeeData);
       const response = await api.post('/employees', employeeData);
-      return response.data;
+      
+      if (response && response.data) {
+        console.log('✅ Employee created successfully');
+        return response.data;
+      } else {
+        throw new Error('Invalid response format from server');
+      }
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to create employee');
+      console.error('❌ Failed to create employee:', error);
+      
+      if (error.message.includes('Cannot connect to server')) {
+        throw new Error('Backend server is not running. Please start the server on port 5050.');
+      }
+      
+      if (error.message.includes('Authentication failed')) {
+        throw new Error('Your session has expired. Please login again.');
+      }
+      
+      throw new Error(error.message || 'Failed to create employee');
     }
   },
 
@@ -35,9 +67,10 @@ const employeeService = {
   updateEmployee: async (id, employeeData) => {
     try {
       const response = await api.put(`/employees/${id}`, employeeData);
-      return response.data;
+      return response.data || response;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to update employee');
+      console.error('Failed to update employee:', error);
+      throw new Error(error.message || 'Failed to update employee');
     }
   },
 
@@ -45,9 +78,21 @@ const employeeService = {
   deleteEmployee: async (id) => {
     try {
       const response = await api.delete(`/employees/${id}`);
-      return response.data;
+      return response.data || response;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to delete employee');
+      console.error('Failed to delete employee:', error);
+      throw new Error(error.message || 'Failed to delete employee');
+    }
+  },
+
+  // Get employee by ID
+  getEmployeeById: async (id) => {
+    try {
+      const response = await api.get(`/employees/${id}`);
+      return response.data || response;
+    } catch (error) {
+      console.error('Failed to fetch employee:', error);
+      throw new Error(error.message || 'Failed to fetch employee');
     }
   },
 
@@ -55,9 +100,10 @@ const employeeService = {
   getEmployeesByBranch: async (branchId, params = {}) => {
     try {
       const response = await api.get(`/employees/branch/${branchId}`, { params });
-      return response.data;
+      return response.data || response;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch employees by branch');
+      console.error('Failed to fetch employees by branch:', error);
+      throw new Error(error.message || 'Failed to fetch employees by branch');
     }
   },
 
@@ -67,9 +113,10 @@ const employeeService = {
       const response = await api.get('/employees/search', { 
         params: { query, ...params } 
       });
-      return response.data;
+      return response.data || response;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to search employees');
+      console.error('Failed to search employees:', error);
+      throw new Error(error.message || 'Failed to search employees');
     }
   },
 
@@ -77,9 +124,10 @@ const employeeService = {
   getEmployeeStats: async () => {
     try {
       const response = await api.get('/employees/stats');
-      return response.data;
+      return response.data || response;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch employee statistics');
+      console.error('Failed to fetch employee statistics:', error);
+      throw new Error(error.message || 'Failed to fetch employee statistics');
     }
   },
 
@@ -90,9 +138,10 @@ const employeeService = {
         employeeIds,
         updateData
       });
-      return response.data;
+      return response.data || response;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to bulk update employees');
+      console.error('Failed to bulk update employees:', error);
+      throw new Error(error.message || 'Failed to bulk update employees');
     }
   },
 
@@ -103,9 +152,10 @@ const employeeService = {
         params: { format, ...filters },
         responseType: 'blob'
       });
-      return response.data;
+      return response.data || response;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to export employees');
+      console.error('Failed to export employees:', error);
+      throw new Error(error.message || 'Failed to export employees');
     }
   },
 
@@ -120,9 +170,10 @@ const employeeService = {
           'Content-Type': 'multipart/form-data'
         }
       });
-      return response.data;
+      return response.data || response;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to upload profile picture');
+      console.error('Failed to upload profile picture:', error);
+      throw new Error(error.message || 'Failed to upload profile picture');
     }
   }
 };

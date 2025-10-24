@@ -11,46 +11,29 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
       validate: {
-        notEmpty: { msg: 'Branch name is required' },
-        len: { args: [2, 100], msg: 'Branch name must be between 2 and 100 characters' }
-      }
-    },
-    manager: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      validate: {
-        len: { args: [0, 100], msg: 'Manager name cannot exceed 100 characters' }
+        notEmpty: { msg: 'Branch name is required' }
       }
     },
     contact: {
       type: DataTypes.STRING,
-      allowNull: true,
+      allowNull: false,
       validate: {
-        is: { args: /^[0-9]{10,15}$/, msg: 'Contact must be 10-15 digits' }
+        notEmpty: { msg: 'Contact is required' }
       }
     },
     address: {
-      type: DataTypes.STRING,
+      type: DataTypes.TEXT,
       allowNull: false,
       validate: {
-        notEmpty: { msg: 'Branch address is required' },
-        len: { args: [1, 500], msg: 'Address cannot exceed 500 characters' }
+        notEmpty: { msg: 'Address is required' }
       }
     },
     establishedAt: {
       type: DataTypes.DATE,
-      allowNull: true,
+      allowNull: false,
       validate: {
-        isDate: { msg: 'Please enter a valid date' }
-      }
-    },
-    email: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      validate: {
-        isEmail: { msg: 'Please enter a valid email' }
+        isDate: { msg: 'Please enter a valid establishment date' }
       }
     },
     status: {
@@ -59,17 +42,13 @@ module.exports = (sequelize, DataTypes) => {
     }
   }, {
     tableName: 'branches',
-    timestamps: true,
-    freezeTableName: true // ✅ ADD THIS to prevent pluralization
+    timestamps: true
   });
 
-  // Add associations
   Branch.associate = function(models) {
     Branch.hasMany(models.Employee, {
       foreignKey: 'branchId',
-      as: 'employees',
-      onDelete: 'RESTRICT',
-      onUpdate: 'CASCADE'
+      as: 'employees'
     });
   };
 
