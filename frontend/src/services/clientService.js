@@ -1,90 +1,100 @@
 // src/services/clientService.js
-import { apiRequest } from './api';
-import { getStoredToken } from './authService';
+import api from './api';
 
-// Helper to ensure token exists
-const getAuthToken = () => {
-  const token = getStoredToken();
-  if (!token) {
-    throw new Error('No authentication token found. Please log in again.');
-  }
-  return token;
-};
-
-export const clientService = {
-  // Get all clients
+const clientService = {
   getClients: async () => {
-    const response = await apiRequest('/clients', 'GET', null, getAuthToken());
-    console.log('🔧 Raw clients response:', response);
-    
-    // Handle different response formats
-    if (response && Array.isArray(response)) {
-      return response; // Direct array
-    } else if (response && response.clients) {
-      return response.clients; // { clients: [...] }
-    } else if (response && response.data) {
-      return response.data; // { data: [...] }
-    } else {
-      console.warn('Unexpected clients response format:', response);
+    try {
+      console.log('🔧 Fetching clients...');
+      const response = await api.get('/clients');
+      console.log('🔧 Clients response:', response);
+      
+      if (response.success && response.data) {
+        // Handle array directly
+        if (Array.isArray(response.data)) {
+          return response.data;
+        }
+        // Handle nested arrays
+        if (response.data.clients && Array.isArray(response.data.clients)) {
+          return response.data.clients;
+        }
+        // Handle data property
+        if (response.data.data && Array.isArray(response.data.data)) {
+          return response.data.data;
+        }
+      }
+      
+      console.warn('Unexpected clients format:', response);
       return [];
+      
+    } catch (error) {
+      console.error('❌ Get clients error:', error);
+      throw error;
     }
   },
-  
-  // Get client by ID
+
+  // ... keep other methods the same but simplify the response handling
   getClientById: async (id) => {
-    const response = await apiRequest(`/clients/${id}`, 'GET', null, getAuthToken());
-    return response;
-  },
-  
-  // Create new client
-  createClient: async (clientData) => {
-    const response = await apiRequest('/clients', 'POST', clientData, getAuthToken());
-    return response;
-  },
-  
-  // Update client
-  updateClient: async (id, clientData) => {
-    const response = await apiRequest(`/clients/${id}`, 'PUT', clientData, getAuthToken());
-    
-    // Handle different response formats
-    if (response && response.client) {
-      return response.client; // { client: {...} }
-    } else if (response && response.data) {
-      return response.data; // { data: {...} }
-    } else {
-      return response; // Direct object
+    try {
+      const response = await api.get(`/clients/${id}`);
+      return response.success ? response.data : null;
+    } catch (error) {
+      console.error('Get client error:', error);
+      throw error;
     }
   },
-  
-  // Delete client
-  deleteClient: async (id) => {
-    const response = await apiRequest(`/clients/${id}`, 'DELETE', null, getAuthToken());
-    return response;
+
+  createClient: async (clientData) => {
+    try {
+      const response = await api.post('/clients', clientData);
+      return response.success ? response.data : null;
+    } catch (error) {
+      console.error('Create client error:', error);
+      throw error;
+    }
   },
-  
-  // Search clients
+
+  updateClient: async (id, clientData) => {
+    try {
+      const response = await api.put(`/clients/${id}`, clientData);
+      return response.success ? response.data : null;
+    } catch (error) {
+      console.error('Update client error:', error);
+      throw error;
+    }
+  },
+
+  deleteClient: async (id) => {
+    try {
+      const response = await api.delete(`/clients/${id}`);
+      return response.success;
+    } catch (error) {
+      console.error('Delete client error:', error);
+      throw error;
+    }
+  },
+
   searchClients: async (query) => {
-    const response = await apiRequest(`/clients/search?query=${encodeURIComponent(query)}`, 'GET', null, getAuthToken());
-    
-    // Handle different response formats
-    if (response && response.clients) {
-      return response.clients; // { clients: [...] }
-    } else if (response && response.data) {
-      return response.data; // { data: [...] }
-    } else if (Array.isArray(response)) {
-      return response; // Direct array
-    } else {
-      console.warn('Unexpected search response format:', response);
+    try {
+      const response = await api.get(`/clients/search?query=${encodeURIComponent(query)}`);
+      
+      if (response.success && response.data) {
+        if (Array.isArray(response.data)) {
+          return response.data;
+        }
+        if (response.data.clients && Array.isArray(response.data.clients)) {
+          return response.data.clients;
+        }
+        if (response.data.data && Array.isArray(response.data.data)) {
+          return response.data.data;
+        }
+      }
+      
       return [];
+    } catch (error) {
+      console.error('Search clients error:', error);
+      throw error;
     }
   }
 };
 
-export const {
-  getClients,
-  getClientById,
-  createClient,
-  updateClient,
-  deleteClient,
-  searchClients
-} = clientService;
+export default clientService;

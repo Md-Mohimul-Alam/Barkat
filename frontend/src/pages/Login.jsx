@@ -1,9 +1,10 @@
+// src/pages/Login.jsx
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import DropdownMenu from './UI/dropdown';
 import { notifySuccess, notifyError } from './UI/Toast';
-import { loginAndStore } from '../services/authService';
+import authService from '../services/authService';
 
 const Login = () => {
   const { login } = useAuth();
@@ -14,6 +15,7 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
+  const [loading, setLoading] = useState(false);
 
   // Role mapping: UI role → DB role
   const roleMap = {
@@ -32,43 +34,72 @@ const Login = () => {
       return;
     }
 
+    setLoading(true);
+    setError('');
+
     try {
       // Map UI role to backend role
       const backendRole = roleMap[selectedRole];
 
-      // Call the login service
-      const data = await loginAndStore(email, password, backendRole, rememberMe);
+      console.log('Calling authService.loginUser with:', { email, password: '***', backendRole });
+      
+      const data = await authService.loginUser(email, password, backendRole, rememberMe);
+      console.log('Login response data:', data);
 
-      if (data.user.role !== backendRole) {
-        const msg = 'Selected role does not match account role';
+      if (data.success && data.user) {
+        const userData = data.user;
+
+        console.log('User data to store:', userData);
+
+        // Check role match
+        if (userData.role !== backendRole) {
+          const msg = 'Selected role does not match account role';
+          setError(msg);
+          notifyError(msg);
+          return;
+        }
+
+        // ✅ CORRECT: Call login with individual parameters
+        const loginResult = await login(email, password, backendRole, rememberMe);
+        
+        if (loginResult.success) {
+          notifySuccess('Login successful! Redirecting...');
+
+          // Redirect to respective dashboard
+          setTimeout(() => {
+            switch (selectedRole) {
+              case 'admin-dashboard':
+                navigate('/app/admin-dashboard', { replace: true });
+                break;
+              case 'manager-dashboard':
+                navigate('/app/manager-dashboard', { replace: true });
+                break;
+              case 'employee-dashboard':
+                navigate('/app/employee-dashboard', { replace: true });
+                break;
+              default:
+                navigate('/unauthorized', { replace: true });
+            }
+          }, 100);
+        } else {
+          const msg = loginResult.message || 'Login context failed';
+          setError(msg);
+          notifyError(msg);
+        }
+
+      } else {
+        const msg = data.message || 'Login failed - no token received';
         setError(msg);
         notifyError(msg);
-        return;
       }
 
-      // Save to global auth context
-      login({ ...data.user, token: data.token }, rememberMe);
-      notifySuccess('Login successful! Redirecting...');
-
-      // Redirect to respective dashboard
-      switch (selectedRole) {
-        case 'admin-dashboard':
-          navigate('/app/admin-dashboard');
-          break;
-        case 'manager-dashboard':
-          navigate('/app/manager-dashboard');
-          break;
-        case 'employee-dashboard':
-          navigate('/app/employee-dashboard');
-          break;
-        default:
-          navigate('/unauthorized');
-      }
     } catch (err) {
-      console.error(err);
+      console.error('Login error:', err);
       const msg = err.message || 'Login failed. Please try again.';
       setError(msg);
       notifyError(msg);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -93,6 +124,7 @@ const Login = () => {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
+              disabled={loading}
             />
           </div>
 
@@ -105,6 +137,7 @@ const Login = () => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="********"
               required
+              disabled={loading}
             />
           </div>
 
@@ -118,6 +151,7 @@ const Login = () => {
                 { label: 'Employee', value: 'employee-dashboard' }
               ]}
               onSelect={(role) => setSelectedRole(role)}
+              disabled={loading}
             />
           </div>
 
@@ -128,6 +162,7 @@ const Login = () => {
                 checked={rememberMe}
                 onChange={() => setRememberMe(!rememberMe)}
                 className="h-4 w-4 text-blue-600"
+                disabled={loading}
               />
               <span>Remember Me</span>
             </label>
@@ -141,9 +176,19 @@ const Login = () => {
 
           <button
             type="submit"
-            className="w-full bg-orange-600 text-white py-2 rounded hover:bg-orange-700 transition"
+            disabled={loading}
+            className={`w-full bg-orange-600 text-white py-2 rounded hover:bg-orange-700 transition flex items-center justify-center ${
+              loading ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
           >
-            Sign In
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Signing In...
+              </>
+            ) : (
+              'Sign In'
+            )}
           </button>
         </form>
         <div className="mt-4 text-center">

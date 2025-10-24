@@ -1,8 +1,9 @@
+// src/components/shared/Sidebar.jsx
 import React, { useState, useEffect } from 'react';
 import {
   Sidebar,
   Menu,
- MenuItem,
+  MenuItem,
   SubMenu,
 } from 'react-pro-sidebar';
 import {
@@ -21,7 +22,6 @@ import {
   FaUserCircle,
   FaCog,
   FaSignOutAlt,
-  FaBars,
   FaRegCircle,
   FaDotCircle
 } from 'react-icons/fa';
@@ -85,13 +85,27 @@ const SidebarMenu = ({ collapsed, onToggle }) => {
     navigate('/login');
   };
 
+  // Get dashboard path based on user role
+  const getDashboardPath = () => {
+    switch (user?.role) {
+      case 'admin':
+        return '/app/admin-dashboard';
+      case 'manager':
+        return '/app/manager-dashboard';
+      case 'employee':
+        return '/app/employee-dashboard';
+      default:
+        return '/app/admin-dashboard';
+    }
+  };
+
   const menuItems = [
     {
       key: 'dashboard',
       label: 'Dashboard',
       icon: <FaHome className="w-5 h-5" />,
       allowedRoles: ['admin', 'manager', 'employee'],
-      path: '/app/admin-dashboard'
+      getPath: getDashboardPath // Dynamic path based on role
     },
     {
       key: 'branch',
@@ -241,24 +255,32 @@ const SidebarMenu = ({ collapsed, onToggle }) => {
     (item) => !item.allowedRoles || item.allowedRoles.includes(user?.role)
   );
 
-  const isActive = (path) => activePath === path;
+  const isActive = (path) => {
+    // Handle dynamic dashboard paths
+    if (path && path.includes('dashboard')) {
+      const currentDashboardPath = getDashboardPath();
+      return location.pathname === currentDashboardPath;
+    }
+    
+    return activePath === path;
+  };
 
-  // Menu item classes - REMOVED unused isSubmenu parameter
+  // Menu item classes
   const menuItemClass = (isActive) => {
     const baseClasses = "transition-all duration-300 font-medium rounded-lg mx-2 my-1";
     
     if (isActive) {
       return `${baseClasses} ${
         isDark 
-          ? 'bg-orange-600 text-black shadow-lg' 
+          ? 'bg-orange-600 text-white shadow-lg' 
           : 'bg-orange-500 text-white shadow-md'
       }`;
     }
     
     return `${baseClasses} ${
       isDark 
-        ? 'text-white' 
-        : 'text-black'
+        ? 'text-gray-300 hover:text-white hover:bg-gray-700' 
+        : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
     }`;
   };
 
@@ -270,14 +292,14 @@ const SidebarMenu = ({ collapsed, onToggle }) => {
       return `${baseClasses} ${
         isDark 
           ? 'bg-orange-600 text-white border-l-4 border-orange-400 shadow-inner font-semibold' 
-          : 'bg-orange-500 text-black border-l-4 border-orange-600 shadow-sm font-semibold'
+          : 'bg-orange-500 text-white border-l-4 border-orange-600 shadow-sm font-semibold'
       }`;
     }
     
     return `${baseClasses} ${
       isDark 
-        ? 'text-black' 
-        : 'text-black'
+        ? 'text-gray-400 hover:text-white hover:bg-gray-700' 
+        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
     }`;
   };
 
@@ -289,13 +311,13 @@ const SidebarMenu = ({ collapsed, onToggle }) => {
         : <FaDotCircle className="w-3 h-3 text-white" />;
     }
     return isDark 
-      ? <FaRegCircle className="w-2.5 h-2.5 text-black" />
-      : <FaRegCircle className="w-2.5 h-2.5 text-black" />;
+      ? <FaRegCircle className="w-2.5 h-2.5 text-gray-400" />
+      : <FaRegCircle className="w-2.5 h-2.5 text-gray-400" />;
   };
 
   const sidebarBg = isDark 
-    ? 'bg-gradient-to-b from-gray-900 via-gray-800 to-gray-800 text-black ' 
-    : 'bg-gradient-to-b from-white via-gray-50 to-white ';
+    ? 'bg-gradient-to-b from-gray-900 via-gray-800 to-gray-800' 
+    : 'bg-gradient-to-b from-white via-gray-50 to-white';
 
   const UserProfile = () => (
     <div className={`p-4 border-b sticky top-0 z-10 ${
@@ -352,17 +374,17 @@ const SidebarMenu = ({ collapsed, onToggle }) => {
           transition-all duration-300 font-medium rounded-lg mx-2 my-1
           ${isMenuOpen 
             ? (isDark 
-                ? 'bg-orange-500 text-white hover:text-black border-l-4 border-orange-500' 
-                : 'bg-orange-500 text-black border-l-4 border-orange-500'
+                ? 'bg-orange-500 text-white hover:bg-orange-600 border-l-4 border-orange-400' 
+                : 'bg-orange-500 text-white hover:bg-orange-600 border-l-4 border-orange-600'
               )
             : (hasActiveChild
                 ? (isDark 
-                    ? 'bg-orange-600 text-white ' 
-                    : 'bg-orange-600 text-black '
+                    ? 'bg-orange-600 text-white' 
+                    : 'bg-orange-600 text-white'
                   )
                 : (isDark 
-                    ? 'text-white hover:text-black ' 
-                    : 'text-black '
+                    ? 'text-gray-300 hover:text-white hover:bg-gray-700' 
+                    : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
                   )
               )
           }
@@ -391,15 +413,17 @@ const SidebarMenu = ({ collapsed, onToggle }) => {
   const renderMenuItem = (item, level = 0) => {
     if (level > 1) return null;
 
-    if (item.path) {
+    // Get the path - either static or dynamic
+    const itemPath = item.getPath ? item.getPath() : item.path;
+
+    if (itemPath) {
       return (
         <MenuItem
           key={item.key}
           icon={level === 0 ? item.icon : <FaRegCircle className="w-3 h-3" />}
-          component={<Link to={item.path} />}
-          // REMOVED the second parameter since it's no longer used
-          className={menuItemClass(isActive(item.path))}
-          active={isActive(item.path)}
+          component={<Link to={itemPath} />}
+          className={menuItemClass(isActive(itemPath))}
+          active={isActive(itemPath)}
         >
           {!collapsed && item.label}
         </MenuItem>
@@ -417,7 +441,7 @@ const SidebarMenu = ({ collapsed, onToggle }) => {
     <div className="h-screen flex flex-col">
       <Sidebar 
         collapsed={collapsed} 
-        className={`h-full border-0 ${sidebarBg} shadow-2xl relative flex flex-col hover:bg-`}
+        className={`h-full border-0 ${sidebarBg} shadow-2xl relative flex flex-col`}
         rootStyles={{
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
           display: 'flex',
@@ -434,23 +458,22 @@ const SidebarMenu = ({ collapsed, onToggle }) => {
         {/* Scrollable Navigation Items */}
         <div className="flex-1 flex flex-col min-h-0">
           <Menu 
-            className={`${sidebarBg} flex-1 overflow-hidden list-none`}
+            className={`${sidebarBg} flex-1 overflow-hidden`}
             menuItemStyles={{
               button: ({ level }) => ({
                 padding: level === 0 ? '12px 16px' : '8px 12px',
                 margin: level === 0 ? '2px 8px' : '1px 8px',
                 borderRadius: '4px',
-                
               }),
             }}
           >
             {/* Navigation Items Container with Scroll */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-200px)] custom-scrollbar list-none">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-200px)] custom-scrollbar">
               {accessibleItems.map((item) => renderMenuItem(item))}
             </div>
 
             {/* Fixed Footer Actions */}
-            <div className={`border-t flex-shrink-0 list-none mb-8 ${
+            <div className={`border-t flex-shrink-0 mb-8 ${
               isDark ? 'border-gray-700' : 'border-gray-200'
             }`}>
               <MenuItem
@@ -466,8 +489,8 @@ const SidebarMenu = ({ collapsed, onToggle }) => {
                 onClick={handleLogout}
                 className={`mx-2 my-1 rounded-lg transition-all duration-300 font-medium ${
                   isDark 
-                    ? 'text-white' 
-                    : 'text-black'
+                    ? 'text-gray-300 hover:text-white hover:bg-gray-700' 
+                    : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
                 }`}
               >
                 {!collapsed && 'Logout'}

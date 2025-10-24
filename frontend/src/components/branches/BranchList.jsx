@@ -1,18 +1,21 @@
+// src/components/branches/BranchList.jsx
 import React, { useEffect, useState } from 'react';
 import { FaEdit, FaTrash, FaPlus, FaBuilding, FaUser, FaPhone, FaMapMarker, FaCalendar, FaSpinner, FaSearch, FaFilter } from 'react-icons/fa';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import { getBranches, deleteBranch, updateBranch } from '../../services/branchService';
+import branchService from '../../services/branchService';
 import TopBar from '../shared/Topbar';
 import SidebarWrapper from '../shared/Sidebar';
 import Footer from '../shared/Footer';
 import { notifyError, notifySuccess } from '../../pages/UI/Toast';
+import { useNavigate } from 'react-router-dom';
 
 const BranchList = () => {
   const { theme } = useTheme();
   const { user } = useAuth();
   const isDark = theme === 'dark';
-
+  const navigate = useNavigate();
+  
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [branches, setBranches] = useState([]);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -27,16 +30,46 @@ const BranchList = () => {
 
   useEffect(() => {
     fetchBranches();
-  }, [user.token]);
+  }, []);
 
   const fetchBranches = async () => {
     try {
       setLoading(true);
-      const data = await getBranches(user.token);
-      setBranches(data);
+      console.log('🔧 Fetching branches...');
+      
+      const response = await branchService.getBranches();
+      console.log('🔧 Branches API response:', response);
+      
+      // Handle different response formats
+      let branchesData = [];
+      
+      if (Array.isArray(response)) {
+        // Direct array response
+        branchesData = response;
+      } else if (response && Array.isArray(response.data)) {
+        // Wrapped in data property
+        branchesData = response.data;
+      } else if (response && response.data && Array.isArray(response.data.branches)) {
+        // Nested branches array
+        branchesData = response.data.branches;
+      } else if (response && response.branches) {
+        // Direct branches property
+        branchesData = response.branches;
+      } else if (response && response.success && Array.isArray(response.data)) {
+        // Success wrapper with data array
+        branchesData = response.data;
+      } else {
+        console.warn('Unexpected branches response format:', response);
+        branchesData = [];
+      }
+      
+      console.log('🔧 Processed branches data:', branchesData);
+      setBranches(branchesData);
+      
     } catch (err) {
-      console.error(err);
-      notifyError('Failed to load branches');
+      console.error('Error fetching branches:', err);
+      notifyError(err.message || 'Failed to load branches');
+      setBranches([]); // Ensure it's always an array
     } finally {
       setLoading(false);
     }
@@ -52,7 +85,7 @@ const BranchList = () => {
 
     setSaveLoading(true);
     try {
-      await updateBranch(editingBranch.id, editingBranch, user.token);
+      await branchService.updateBranch(editingBranch.id, editingBranch);
       setBranches(prev => prev.map(branch => 
         branch.id === editingBranch.id ? editingBranch : branch
       ));
@@ -74,7 +107,7 @@ const BranchList = () => {
 
     setDeletingId(branchId);
     try {
-      await deleteBranch(branchId, user.token);
+      await branchService.deleteBranch(branchId);
       setBranches(prev => prev.filter(branch => branch.id !== branchId));
       notifySuccess('Branch deleted successfully');
     } catch (err) {
@@ -98,13 +131,18 @@ const BranchList = () => {
     setSortConfig({ key, direction });
   };
 
-  const filteredAndSortedBranches = branches
-    .filter(branch => 
-      branch.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      branch.manager.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      branch.contact.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      branch.address.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+  // Safe filtering and sorting
+  const filteredAndSortedBranches = (branches || [])
+    .filter(branch => {
+      if (!branch) return false;
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        (branch.name?.toLowerCase() || '').includes(searchLower) ||
+        (branch.manager?.toLowerCase() || '').includes(searchLower) ||
+        (branch.contact?.toLowerCase() || '').includes(searchLower) ||
+        (branch.address?.toLowerCase() || '').includes(searchLower)
+      );
+    })
     .sort((a, b) => {
       if (!sortConfig.key) return 0;
       
@@ -131,6 +169,16 @@ const BranchList = () => {
     );
   };
 
+  // Safe date formatting
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    try {
+      return dateString.split('T')[0];
+    } catch {
+      return dateString;
+    }
+  };
+
   return (
     <div className={`min-h-screen flex ${isDark ? 'bg-cyan-950 text-[#ffffff]' : 'bg-[#ffffff] text-gray-900'}`}>
       <SidebarWrapper collapsed={sidebarCollapsed} />
@@ -145,7 +193,7 @@ const BranchList = () => {
               <div>
                 <h1 className="text-2xl font-bold">Branch List</h1>
                 <p className={`text-sm ${isDark ? 'text-cyan-200' : 'text-gray-600'}`}>
-                  Manage your organization branches ({branches.length} total)
+                  Manage your organization branches ({(branches || []).length} total)
                 </p>
               </div>
             </div>
@@ -166,6 +214,7 @@ const BranchList = () => {
                 />
               </div>
               <button
+                onClick={() => navigate('/app/branches/add')}
                 className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center shadow-lg hover:shadow-xl ${
                   isDark
                     ? 'bg-[#f85924] hover:bg-[#d13602] text-white'
@@ -244,35 +293,37 @@ const BranchList = () => {
                       key={branch.id} 
                       className={`transition-colors duration-150 ${
                         isDark 
-                          ? `hover:bg-cyan-800 ${index !== branches.length - 1 ? 'border-b border-cyan-700' : ''}` 
-                          : `hover:bg-gray-50 ${index !== branches.length - 1 ? 'border-b border-gray-200' : ''}`
+                          ? `hover:bg-cyan-800 ${index !== filteredAndSortedBranches.length - 1 ? 'border-b border-cyan-700' : ''}` 
+                          : `hover:bg-gray-50 ${index !== filteredAndSortedBranches.length - 1 ? 'border-b border-gray-200' : ''}`
                       }`}
                     >
                       <td className="p-4">
-                        <div className="font-semibold">{branch.name}</div>
+                        <div className="font-semibold">{branch.name || 'N/A'}</div>
                       </td>
                       <td className="p-4">
                         <div className="flex items-center">
                           <FaUser className={`w-3 h-3 mr-2 ${isDark ? 'text-cyan-400' : 'text-gray-400'}`} />
-                          {branch.manager}
+                          {branch.manager || 'N/A'}
                         </div>
                       </td>
                       <td className="p-4">
                         <div className="flex items-center">
                           <FaPhone className={`w-3 h-3 mr-2 ${isDark ? 'text-cyan-400' : 'text-gray-400'}`} />
-                          {branch.contact}
+                          {branch.contact || 'N/A'}
                         </div>
                       </td>
                       <td className="p-4">
                         <div className="flex items-center">
                           <FaMapMarker className={`w-3 h-3 mr-2 ${isDark ? 'text-cyan-400' : 'text-gray-400'}`} />
-                          <span className="max-w-xs truncate">{branch.address}</span>
+                          <span className="max-w-xs truncate" title={branch.address}>
+                            {branch.address || 'N/A'}
+                          </span>
                         </div>
                       </td>
                       <td className="p-4">
                         <div className="flex items-center">
                           <FaCalendar className={`w-3 h-3 mr-2 ${isDark ? 'text-cyan-400' : 'text-gray-400'}`} />
-                          {branch.establishedAt?.split('T')[0]}
+                          {formatDate(branch.establishedAt)}
                         </div>
                       </td>
                       <td className="p-4">
@@ -316,6 +367,7 @@ const BranchList = () => {
             {loading && (
               <div className="flex justify-center items-center py-12">
                 <FaSpinner className="animate-spin w-8 h-8 text-[#f85924]" />
+                <span className="ml-3">Loading branches...</span>
               </div>
             )}
 
@@ -331,6 +383,7 @@ const BranchList = () => {
                 </p>
                 {!searchTerm && (
                   <button
+                    onClick={() => navigate('/app/branches/add')}
                     className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 flex items-center mx-auto shadow-lg hover:shadow-xl ${
                       isDark
                         ? 'bg-[#f85924] hover:bg-[#d13602] text-white'
@@ -348,7 +401,7 @@ const BranchList = () => {
           {/* Table Info Footer */}
           {filteredAndSortedBranches.length > 0 && (
             <div className={`mt-4 text-sm ${isDark ? 'text-cyan-300' : 'text-gray-600'}`}>
-              Showing {filteredAndSortedBranches.length} of {branches.length} branches
+              Showing {filteredAndSortedBranches.length} of {(branches || []).length} branches
               {searchTerm && ` for "${searchTerm}"`}
             </div>
           )}
@@ -356,7 +409,7 @@ const BranchList = () => {
         <Footer />
       </div>
 
-      {/* Edit Branch Modal - Keep the same modal as before */}
+      {/* Edit Branch Modal */}
       {editModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className={`rounded-2xl p-6 w-full max-w-md shadow-2xl ${
@@ -384,7 +437,7 @@ const BranchList = () => {
                   </label>
                   <input
                     type="text"
-                    value={editingBranch.name}
+                    value={editingBranch.name || ''}
                     onChange={(e) => setEditingBranch({...editingBranch, name: e.target.value})}
                     className={`w-full rounded-xl border-2 px-4 py-3 transition-all duration-200 focus:ring-2 focus:ring-[#f85924] focus:border-transparent ${
                       isDark 
@@ -401,7 +454,7 @@ const BranchList = () => {
                   </label>
                   <input
                     type="text"
-                    value={editingBranch.manager}
+                    value={editingBranch.manager || ''}
                     onChange={(e) => setEditingBranch({...editingBranch, manager: e.target.value})}
                     className={`w-full rounded-xl border-2 px-4 py-3 transition-all duration-200 focus:ring-2 focus:ring-[#f85924] focus:border-transparent ${
                       isDark 
@@ -418,7 +471,7 @@ const BranchList = () => {
                   </label>
                   <input
                     type="text"
-                    value={editingBranch.contact}
+                    value={editingBranch.contact || ''}
                     onChange={(e) => setEditingBranch({...editingBranch, contact: e.target.value})}
                     className={`w-full rounded-xl border-2 px-4 py-3 transition-all duration-200 focus:ring-2 focus:ring-[#f85924] focus:border-transparent ${
                       isDark 
@@ -434,7 +487,7 @@ const BranchList = () => {
                     Address
                   </label>
                   <textarea
-                    value={editingBranch.address}
+                    value={editingBranch.address || ''}
                     onChange={(e) => setEditingBranch({...editingBranch, address: e.target.value})}
                     rows="3"
                     className={`w-full rounded-xl border-2 px-4 py-3 transition-all duration-200 focus:ring-2 focus:ring-[#f85924] focus:border-transparent ${

@@ -4,7 +4,7 @@ import { useTheme } from '../../context/ThemeContext';
 import TopBar from '../shared/Topbar';
 import SidebarWrapper from '../shared/Sidebar';
 import Footer from '../shared/Footer';
-import { createClient } from '../../services/clientService';
+import clientService from '../../services/clientService'; // ✅ Change to default import
 import { toast } from 'react-toastify';
 
 const ClientForm = () => {
@@ -68,7 +68,8 @@ const ClientForm = () => {
 
     setLoading(true);
     try {
-      await createClient(formData);
+      // ✅ Use default import pattern
+      await clientService.createClient(formData);
       toast.success('Client created successfully!');
       navigate('/app/clients');
     } catch (error) {
@@ -124,11 +125,12 @@ const ClientForm = () => {
                     value={formData[id]}
                     onChange={handleChange}
                     required={id !== 'email'}
+                    disabled={loading}
                     className={`rounded-lg border px-4 py-3 text-sm outline-none focus:ring-2 transition-all duration-200
                       ${errors[id] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
                       ${isDark
-                        ? 'bg-[#2C2C2C] border-[#457B9D] text-[#ffffff] placeholder-[#A8A8A8] focus:ring-[#f85924] focus:border-[#f85924]'
-                        : 'bg-white border-gray-300 text-gray-800 placeholder-gray-500 focus:ring-[#f85924] focus:border-[#f85924]'}`}
+                        ? 'bg-[#2C2C2C] border-[#457B9D] text-[#ffffff] placeholder-[#A8A8A8] focus:ring-[#f85924] focus:border-[#f85924] disabled:opacity-50'
+                        : 'bg-white border-gray-300 text-gray-800 placeholder-gray-500 focus:ring-[#f85924] focus:border-[#f85924] disabled:opacity-50'}`}
                   />
                   {errors[id] && (
                     <p className="text-red-500 text-xs mt-1">{errors[id]}</p>
@@ -140,10 +142,11 @@ const ClientForm = () => {
                 <button
                   type="button"
                   onClick={() => navigate('/app/clients')}
+                  disabled={loading}
                   className={`px-8 py-3 rounded-lg font-medium text-sm transition-all duration-200
                     ${isDark
-                      ? 'bg-gray-600 text-white hover:bg-gray-700'
-                      : 'bg-gray-300 text-gray-700 hover:bg-gray-400'}`}
+                      ? 'bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-50'
+                      : 'bg-gray-300 text-gray-700 hover:bg-gray-400 disabled:opacity-50'}`}
                 >
                   Cancel
                 </button>

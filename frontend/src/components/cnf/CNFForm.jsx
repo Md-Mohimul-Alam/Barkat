@@ -1,15 +1,19 @@
+// Update your CNFForm.jsx to use the service properly
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import TopBar from '../shared/Topbar';
 import SidebarWrapper from '../shared/Sidebar';
 import Footer from '../shared/Footer';
+import cnfService from '../../services/cnfService';
+import { notifySuccess, notifyError } from '../../pages/UI/Toast';
 
 const CNFForm = () => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -23,10 +27,27 @@ const CNFForm = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('CNF form submitted:', formData);
-    navigate('/app/cnfs');
+    setLoading(true);
+
+    try {
+      console.log('CNF form submitted:', formData);
+      
+      const response = await cnfService.createCNF(formData);
+      
+      if (response.success) {
+        notifySuccess('CNF created successfully!');
+        navigate('/app/cnfs');
+      } else {
+        notifyError(response.message || 'Failed to create CNF');
+      }
+    } catch (error) {
+      console.error('Error creating CNF:', error);
+      notifyError(error.message || 'Failed to create CNF. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -71,13 +92,21 @@ const CNFForm = () => {
               <div className="md:col-span-2 flex justify-center mt-4">
                 <button
                   type="submit"
-                  className={`px-8 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
+                  disabled={loading}
+                  className={`px-8 py-3 rounded-lg font-medium text-sm transition-all duration-200 flex items-center ${
                     isDark
-                      ? 'bg-[#f85924] text-white hover:bg-[#d13602] shadow-lg'
-                      : 'bg-[#f85924] text-white hover:bg-[#d13602] shadow-md'
-                  }`}
+                      ? 'bg-[#f85924] text-white hover:bg-[#d13602] shadow-lg disabled:bg-orange-400'
+                      : 'bg-[#f85924] text-white hover:bg-[#d13602] shadow-md disabled:bg-orange-400'
+                  } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  ADD CNF
+                  {loading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Creating...
+                    </>
+                  ) : (
+                    'ADD CNF'
+                  )}
                 </button>
               </div>
             </form>

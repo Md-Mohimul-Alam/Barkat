@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import { createBranch } from '../../services/branchService';
+import branchService from '../../services/branchService'; // ✅ Change to default import
 import TopBar from '../shared/Topbar';
 import SidebarWrapper from '../shared/Sidebar';
 import Footer from '../shared/Footer';
@@ -14,6 +14,7 @@ const BranchForm = () => {
   const isDark = theme === 'dark';
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [loading, setLoading] = useState(false); // ✅ Add loading state
 
   const [formData, setFormData] = useState({
     name: '',
@@ -30,13 +31,18 @@ const BranchForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true); // ✅ Start loading
+    
     try {
-      await createBranch(formData, user.token);
+      // ✅ Use default import pattern
+      await branchService.createBranch(formData);
       notifySuccess('Branch created successfully!');
       navigate('/app/branches');
     } catch (err) {
       console.error(err);
       notifyError(err.message || 'Failed to create branch');
+    } finally {
+      setLoading(false); // ✅ Stop loading
     }
   };
 
@@ -71,10 +77,11 @@ const BranchForm = () => {
                     value={formData[id]}
                     onChange={handleChange}
                     required
+                    disabled={loading} // ✅ Disable inputs when loading
                     className={`rounded-lg border px-4 py-3 text-sm outline-none focus:ring-2 transition-all duration-200 ${
                       isDark
-                        ? 'bg-[#2C2C2C] border-[#457B9D] text-[#ffffff] placeholder-[#A8A8A8] focus:ring-[#f85924] focus:border-[#f85924]'
-                        : 'bg-white border-gray-300 text-gray-800 placeholder-gray-500 focus:ring-[#f85924] focus:border-[#f85924]'
+                        ? 'bg-[#2C2C2C] border-[#457B9D] text-[#ffffff] placeholder-[#A8A8A8] focus:ring-[#f85924] focus:border-[#f85924] disabled:opacity-50'
+                        : 'bg-white border-gray-300 text-gray-800 placeholder-gray-500 focus:ring-[#f85924] focus:border-[#f85924] disabled:opacity-50'
                     }`}
                   />
                 </div>
@@ -83,13 +90,21 @@ const BranchForm = () => {
               <div className="md:col-span-2 flex justify-center mt-4">
                 <button
                   type="submit"
-                  className={`px-8 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
+                  disabled={loading} // ✅ Disable button when loading
+                  className={`px-8 py-3 rounded-lg font-medium text-sm transition-all duration-200 flex items-center ${
                     isDark
-                      ? 'bg-[#f85924] text-white hover:bg-[#d13602] shadow-lg'
-                      : 'bg-[#f85924] text-white hover:bg-[#d13602] shadow-md'
+                      ? 'bg-[#f85924] text-white hover:bg-[#d13602] shadow-lg disabled:bg-orange-400 disabled:cursor-not-allowed'
+                      : 'bg-[#f85924] text-white hover:bg-[#d13602] shadow-md disabled:bg-orange-400 disabled:cursor-not-allowed'
                   }`}
                 >
-                  Save Branch
+                  {loading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Creating...
+                    </>
+                  ) : (
+                    'Save Branch'
+                  )}
                 </button>
               </div>
             </form>

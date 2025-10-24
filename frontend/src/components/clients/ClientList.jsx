@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { FaEdit, FaTrash, FaPlus, FaBuilding, FaUser, FaPhone, FaMapMarker, FaCalendar, FaSpinner, FaSearch, FaMoneyBillWave, FaSave, FaTimes } from 'react-icons/fa';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import { getClients, deleteClient, updateClient } from '../../services/clientService';
+import clientService from '../../services/clientService'; // ✅ Change to default import
 import TopBar from '../shared/Topbar';
 import SidebarWrapper from '../shared/Sidebar';
 import Footer from '../shared/Footer';
@@ -36,16 +36,23 @@ const ClientList = () => {
   const fetchClients = async () => {
     try {
       setLoading(true);
-      const data = await getClients();
+      const data = await clientService.getClients();
+      
+      // Data should now be the array directly
       if (data && Array.isArray(data)) {
         setClients(data);
       } else {
+        console.error('Unexpected data format:', data);
         setClients([]);
         notifyError('Invalid data format received');
       }
     } catch (err) {
       console.error('Error fetching clients:', err);
-      notifyError(err.message || 'Failed to load clients');
+      
+      // Only show error if it's not an auth redirect
+      if (!err.message?.includes('Authentication failed')) {
+        notifyError(err.message || 'Failed to load clients');
+      }
       setClients([]);
     } finally {
       setLoading(false);
@@ -70,7 +77,8 @@ const ClientList = () => {
 
     setSaveLoading(true);
     try {
-      const response = await updateClient(editingClient.id, editingClient);
+      // ✅ Use default import pattern
+      const response = await clientService.updateClient(editingClient.id, editingClient);
       
       // Check if response contains the updated client data
       const updatedClient = response || editingClient;
@@ -99,7 +107,8 @@ const ClientList = () => {
 
     setDeletingId(clientToDelete.id);
     try {
-      await deleteClient(clientToDelete.id);
+      // ✅ Use default import pattern
+      await clientService.deleteClient(clientToDelete.id);
       setClients(prev => prev.filter(client => client.id !== clientToDelete.id));
       setDeleteModalOpen(false);
       setClientToDelete(null);
@@ -137,7 +146,8 @@ const ClientList = () => {
       const client = clients.find(c => c.id === clientId);
       if (!client) return;
 
-      await updateClient(clientId, { ...client, establishedAt: newDate });
+      // ✅ Use default import pattern
+      await clientService.updateClient(clientId, { ...client, establishedAt: newDate });
       setClients(prev => prev.map(client => 
         client.id === clientId ? { ...client, establishedAt: newDate } : client
       ));

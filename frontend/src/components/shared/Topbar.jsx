@@ -270,7 +270,7 @@ const TopBar = ({ onToggleSidebar, sidebarCollapsed }) => {
                 </div>
                 <div className="relative">
                   <FaUserCircle className={`w-8 h-8 ${
-                    theme === 'dark' ? 'text-blue-400' : 'text-blue-500'
+                    theme === 'dark' ? 'text-orange-400' : 'text-orange-500'
                   }`} />
                   <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
                 </div>
