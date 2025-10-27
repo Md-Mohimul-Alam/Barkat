@@ -38,7 +38,7 @@ const createCNF = async (req, res) => {
   }
 };
 
-// ✅ Get all CNFs
+// ✅ Get all CNFs - ensure consistent response
 const getAllCNFs = async (req, res) => {
   try {
     const cnfs = await CNF.findAll({
@@ -46,9 +46,11 @@ const getAllCNFs = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
+    // ✅ Return consistent format
     res.json({
       success: true,
-      data: cnfs
+      data: cnfs,
+      count: cnfs.length
     });
   } catch (error) {
     console.error('Get CNFs Error:', error);

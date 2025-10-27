@@ -1,6 +1,5 @@
-// src/components/cnf/CNFList.jsx
-import React, { useEffect, useState } from 'react';
-import { FaEdit, FaTrash, FaPlus, FaBuilding, FaPhone, FaMapMarker, FaCalendar, FaSpinner, FaSearch, FaSave, FaTimes } from 'react-icons/fa';
+import React, { useEffect, useState, useCallback } from 'react';
+import { FaEdit, FaTrash, FaPlus, FaBuilding, FaPhone, FaMapMarker, FaCalendar, FaSpinner, FaSearch, FaSave, FaTimes, FaExclamationTriangle, FaSyncAlt } from 'react-icons/fa';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import TopBar from '../shared/Topbar';
@@ -27,17 +26,17 @@ const CNFList = () => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [cnfToDelete, setCnfToDelete] = useState(null);
+  const [errors, setErrors] = useState({});
 
   const handleToggleSidebar = () => setSidebarCollapsed(prev => !prev);
 
-  useEffect(() => {
-    fetchCNFs();
-  }, []);
-
-  const fetchCNFs = async () => {
+  const fetchCNFs = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await cnfService.getAllCNFs();
+      setErrors({});
+      
+      // ✅ Fix: Use getCNFs instead of getAllCNFs
+      const response = await cnfService.getCNFs();
       console.log('🔧 CNF API response:', response);
       
       // Handle different response formats
@@ -61,6 +60,7 @@ const CNFList = () => {
       setCnfs(cnfsData);
     } catch (err) {
       console.error('Error fetching CNFs:', err);
+      setErrors({ fetch: err.message || 'Failed to load CNFs' });
       
       // Handle role permission errors gracefully
       if (err.message?.includes('Access denied') || err.message?.includes('role not permitted')) {
@@ -73,24 +73,47 @@ const CNFList = () => {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    fetchCNFs();
+  }, [fetchCNFs]);
+
+  const validateCNFForm = (cnf) => {
+    const newErrors = {};
+    
+    if (!cnf.name?.trim()) newErrors.name = 'CNF name is required';
+    if (!cnf.contact?.trim()) newErrors.contact = 'Contact number is required';
+    if (!cnf.address?.trim()) newErrors.address = 'Address is required';
+    if (!cnf.establishedAt) newErrors.establishedAt = 'Establishment date is required';
+
+    // Contact validation
+    const contactRegex = /^[0-9]{10,15}$/;
+    if (cnf.contact && !contactRegex.test(cnf.contact)) {
+      newErrors.contact = 'Contact must be 10-15 digits';
+    }
+
+    return newErrors;
   };
 
   const handleEditCNF = (cnf) => {
     setEditingCNF({...cnf});
+    setErrors({});
     setEditModalOpen(true);
   };
 
   const handleSaveCNF = async () => {
     if (!editingCNF) return;
 
-    // Validation
-    if (!editingCNF.name?.trim() || !editingCNF.contact?.trim() || 
-        !editingCNF.address?.trim() || !editingCNF.establishedAt) {
-      notifyError('Please fill in all required fields');
+    const formErrors = validateCNFForm(editingCNF);
+    if (Object.keys(formErrors).length > 0) {
+      setErrors(formErrors);
+      notifyError('Please fix the form errors');
       return;
     }
 
     setSaveLoading(true);
+    setErrors({});
     try {
       const response = await cnfService.updateCNF(editingCNF.id, editingCNF);
       
@@ -105,6 +128,7 @@ const CNFList = () => {
       notifySuccess('CNF updated successfully');
     } catch (err) {
       console.error('Error updating CNF:', err);
+      setErrors({ save: err.message });
       notifyError(err.message || 'Failed to update CNF');
     } finally {
       setSaveLoading(false);
@@ -120,6 +144,7 @@ const CNFList = () => {
     if (!cnfToDelete) return;
 
     setDeletingId(cnfToDelete.id);
+    setErrors({});
     try {
       await cnfService.deleteCNF(cnfToDelete.id);
       setCnfs(prev => prev.filter(cnf => cnf.id !== cnfToDelete.id));
@@ -128,6 +153,7 @@ const CNFList = () => {
       notifySuccess('CNF deleted successfully');
     } catch (err) {
       console.error('Error deleting CNF:', err);
+      setErrors({ delete: err.message });
       notifyError(err.message || 'Failed to delete CNF');
     } finally {
       setDeletingId(null);
@@ -137,11 +163,13 @@ const CNFList = () => {
   const handleCloseEditModal = () => {
     setEditModalOpen(false);
     setEditingCNF(null);
+    setErrors({});
   };
 
   const handleCloseDeleteModal = () => {
     setDeleteModalOpen(false);
     setCnfToDelete(null);
+    setErrors({});
   };
 
   const handleSort = (key) => {
@@ -224,6 +252,37 @@ const CNFList = () => {
         <TopBar onToggleSidebar={handleToggleSidebar} sidebarCollapsed={sidebarCollapsed} />
 
         <div className="p-6 flex-1">
+          {/* Error Banner */}
+          {errors.fetch && (
+            <div className={`mb-6 p-4 rounded-xl border flex items-center ${
+              isDark 
+                ? 'bg-red-900/20 border-red-700 text-red-300' 
+                : 'bg-red-50 border-red-200 text-red-700'
+            }`}>
+              <FaExclamationTriangle className="w-5 h-5 mr-2" />
+              {errors.fetch}
+              <button 
+                onClick={fetchCNFs}
+                className="ml-auto px-3 py-1 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors flex items-center"
+              >
+                <FaSyncAlt className="w-3 h-3 mr-1" />
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* Permission Notice for non-admin/managers */}
+          {user && !['admin', 'manager'].includes(user.role) && (
+            <div className={`mb-6 p-4 rounded-lg border ${
+              isDark ? 'bg-cyan-800 border-cyan-600' : 'bg-blue-50 border-blue-200'
+            }`}>
+              <p className={`text-sm ${isDark ? 'text-cyan-200' : 'text-blue-700'}`}>
+                ⚠️ <strong>Limited Access:</strong> Your role ({user.role}) may not have permission to view or manage CNF data.
+                Please contact an administrator if you need access.
+              </p>
+            </div>
+          )}
+
           {/* Header Section */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
             <div className="flex items-center">
@@ -251,31 +310,58 @@ const CNFList = () => {
                   }`}
                 />
               </div>
-              <button
-                onClick={() => navigate('/app/cnfs/add')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center shadow-lg hover:shadow-xl ${
-                  isDark
-                    ? 'bg-[#f85924] hover:bg-[#d13602] text-white'
-                    : 'bg-[#f85924] hover:bg-[#d13602] text-white'
-                }`}
-              >
-                <FaPlus className="w-4 h-4 mr-2" />
-                Add CNF
-              </button>
+              {['admin', 'manager'].includes(user?.role) && (
+                <button
+                  onClick={() => navigate('/app/cnfs/add')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center shadow-lg hover:shadow-xl ${
+                    isDark
+                      ? 'bg-[#f85924] hover:bg-[#d13602] text-white'
+                      : 'bg-[#f85924] hover:bg-[#d13602] text-white'
+                  }`}
+                >
+                  <FaPlus className="w-4 h-4 mr-2" />
+                  Add CNF
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Permission Notice for non-admin/managers */}
-          {user && !['admin', 'manager'].includes(user.role) && (
-            <div className={`mb-6 p-4 rounded-lg border ${
-              isDark ? 'bg-cyan-800 border-cyan-600' : 'bg-blue-50 border-blue-200'
-            }`}>
-              <p className={`text-sm ${isDark ? 'text-cyan-200' : 'text-blue-700'}`}>
-                ⚠️ <strong>Limited Access:</strong> Your role ({user.role}) may not have permission to view or manage CNF data.
-                Please contact an administrator if you need access.
-              </p>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <div className={`rounded-xl p-4 ${isDark ? 'bg-cyan-800' : 'bg-blue-50'}`}>
+              <div className="flex items-center">
+                <div className={`p-2 rounded-lg mr-3 ${isDark ? 'bg-cyan-700' : 'bg-blue-100'}`}>
+                  <FaBuilding className={isDark ? 'text-cyan-300' : 'text-blue-600'} />
+                </div>
+                <div>
+                  <p className={`text-sm ${isDark ? 'text-cyan-300' : 'text-gray-600'}`}>Total CNFs</p>
+                  <p className="text-xl font-bold">{cnfs.length}</p>
+                </div>
+              </div>
             </div>
-          )}
+            <div className={`rounded-xl p-4 ${isDark ? 'bg-green-800' : 'bg-green-50'}`}>
+              <div className="flex items-center">
+                <div className={`p-2 rounded-lg mr-3 ${isDark ? 'bg-green-700' : 'bg-green-100'}`}>
+                  <FaCalendar className={isDark ? 'text-green-300' : 'text-green-600'} />
+                </div>
+                <div>
+                  <p className={`text-sm ${isDark ? 'text-green-300' : 'text-gray-600'}`}>Active Partners</p>
+                  <p className="text-xl font-bold">{cnfs.length}</p>
+                </div>
+              </div>
+            </div>
+            <div className={`rounded-xl p-4 ${isDark ? 'bg-purple-800' : 'bg-purple-50'}`}>
+              <div className="flex items-center">
+                <div className={`p-2 rounded-lg mr-3 ${isDark ? 'bg-purple-700' : 'bg-purple-100'}`}>
+                  <FaPhone className={isDark ? 'text-purple-300' : 'text-purple-600'} />
+                </div>
+                <div>
+                  <p className={`text-sm ${isDark ? 'text-purple-300' : 'text-gray-600'}`}>Contactable</p>
+                  <p className="text-xl font-bold">{cnfs.filter(cnf => cnf.contact).length}</p>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Table Container */}
           <div className={`rounded-2xl shadow-lg overflow-hidden border ${
@@ -324,7 +410,9 @@ const CNFList = () => {
                         <SortIcon columnKey="establishedAt" />
                       </div>
                     </th>
-                    <th className="p-4 text-center font-semibold">Actions</th>
+                    {['admin', 'manager'].includes(user?.role) && (
+                      <th className="p-4 text-center font-semibold">Actions</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -360,63 +448,67 @@ const CNFList = () => {
                             <FaCalendar className={`w-3 h-3 mr-2 ${isDark ? 'text-cyan-400' : 'text-gray-400'}`} />
                             {formatDate(cnf.establishedAt)}
                           </div>
-                          <input
-                            type="date"
-                            value={formatDate(cnf.establishedAt)}
-                            onChange={(e) => handleDateChange(cnf.id, e.target.value)}
-                            className={`text-xs rounded border px-2 py-1 w-full transition-colors duration-200 ${
-                              isDark 
-                                ? 'bg-cyan-800 border-cyan-600 text-white hover:bg-cyan-700 focus:bg-cyan-700' 
-                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 focus:bg-white'
-                            } focus:outline-none focus:ring-1 focus:ring-[#f85924] focus:border-[#f85924]`}
-                          />
+                          {['admin', 'manager'].includes(user?.role) && (
+                            <input
+                              type="date"
+                              value={formatDate(cnf.establishedAt)}
+                              onChange={(e) => handleDateChange(cnf.id, e.target.value)}
+                              className={`text-xs rounded border px-2 py-1 w-full transition-colors duration-200 ${
+                                isDark 
+                                  ? 'bg-cyan-800 border-cyan-600 text-white hover:bg-cyan-700 focus:bg-cyan-700' 
+                                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 focus:bg-white'
+                              } focus:outline-none focus:ring-1 focus:ring-[#f85924] focus:border-[#f85924]`}
+                            />
+                          )}
                         </div>
                       </td>
-                      <td className="p-4">
-                        <div className="flex justify-center space-x-3">
-                          {/* Edit Button */}
-                          <button
-                            onClick={() => handleEditCNF(cnf)}
-                            className={`group relative px-4 py-2 rounded-xl font-medium transition-all duration-300 flex items-center shadow-md hover:shadow-lg ${
-                              isDark 
-                                ? 'bg-cyan-700 text-cyan-100 hover:bg-cyan-600 hover:scale-105' 
-                                : 'bg-blue-100 text-blue-700 hover:bg-blue-200 hover:scale-105'
-                            }`}
-                            title="Edit CNF"
-                          >
-                            <FaEdit className={`w-3 h-3 mr-2 transition-transform duration-300 group-hover:scale-110 ${
-                              isDark ? 'text-cyan-200' : 'text-blue-600'
-                            }`} />
-                            Edit
-                          </button>
+                      {['admin', 'manager'].includes(user?.role) && (
+                        <td className="p-4">
+                          <div className="flex justify-center space-x-3">
+                            {/* Edit Button */}
+                            <button
+                              onClick={() => handleEditCNF(cnf)}
+                              className={`group relative px-4 py-2 rounded-xl font-medium transition-all duration-300 flex items-center shadow-md hover:shadow-lg ${
+                                isDark 
+                                  ? 'bg-cyan-700 text-cyan-100 hover:bg-cyan-600 hover:scale-105' 
+                                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200 hover:scale-105'
+                              }`}
+                              title="Edit CNF"
+                            >
+                              <FaEdit className={`w-3 h-3 mr-2 transition-transform duration-300 group-hover:scale-110 ${
+                                isDark ? 'text-cyan-200' : 'text-blue-600'
+                              }`} />
+                              Edit
+                            </button>
 
-                          {/* Delete Button */}
-                          <button
-                            onClick={() => handleDeleteClick(cnf)}
-                            disabled={deletingId === cnf.id}
-                            className={`group relative px-4 py-2 rounded-xl font-medium transition-all duration-300 flex items-center shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
-                              isDark 
-                                ? 'bg-red-700 text-red-100 hover:bg-red-600 hover:scale-105' 
-                                : 'bg-red-100 text-red-700 hover:bg-red-200 hover:scale-105'
-                            }`}
-                            title="Delete CNF"
-                          >
-                            {deletingId === cnf.id ? (
-                              <>
-                                <FaSpinner className="animate-spin w-3 h-3 mr-2" />
-                                Deleting...
-                              </>
-                            ) : (
-                              <>
-                                <FaTrash className={`w-3 h-3 mr-2 transition-transform duration-300 group-hover:scale-110 ${
-                                  isDark ? 'text-red-200' : 'text-red-600'
-                                }`} />
-                                Delete
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </td>
+                            {/* Delete Button */}
+                            <button
+                              onClick={() => handleDeleteClick(cnf)}
+                              disabled={deletingId === cnf.id}
+                              className={`group relative px-4 py-2 rounded-xl font-medium transition-all duration-300 flex items-center shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+                                isDark 
+                                  ? 'bg-red-700 text-red-100 hover:bg-red-600 hover:scale-105' 
+                                  : 'bg-red-100 text-red-700 hover:bg-red-200 hover:scale-105'
+                              }`}
+                              title="Delete CNF"
+                            >
+                              {deletingId === cnf.id ? (
+                                <>
+                                  <FaSpinner className="animate-spin w-3 h-3 mr-2" />
+                                  Deleting...
+                                </>
+                              ) : (
+                                <>
+                                  <FaTrash className={`w-3 h-3 mr-2 transition-transform duration-300 group-hover:scale-110 ${
+                                    isDark ? 'text-red-200' : 'text-red-600'
+                                  }`} />
+                                  Delete
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -494,6 +586,21 @@ const CNFList = () => {
                 </p>
               </div>
             </div>
+
+            {/* Error Display */}
+            {errors.save && (
+              <div className={`mb-4 p-3 rounded-xl border ${
+                isDark 
+                  ? 'bg-red-900/20 border-red-700 text-red-300' 
+                  : 'bg-red-50 border-red-200 text-red-700'
+              }`}>
+                <div className="flex items-center">
+                  <FaExclamationTriangle className="w-4 h-4 mr-2" />
+                  {errors.save}
+                </div>
+              </div>
+            )}
+
             {editingCNF && (
               <div className="space-y-4">
                 <div>
@@ -506,12 +613,20 @@ const CNFList = () => {
                     value={editingCNF.name || ''}
                     onChange={(e) => setEditingCNF({...editingCNF, name: e.target.value})}
                     className={`w-full rounded-xl border-2 px-4 py-3 transition-all duration-200 focus:ring-2 focus:ring-[#f85924] focus:border-transparent ${
+                      errors.name ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                    } ${
                       isDark 
                         ? 'bg-cyan-800 border-cyan-600 text-white placeholder-cyan-400' 
                         : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
                     }`}
                     placeholder="Enter CNF name"
                   />
+                  {errors.name && (
+                    <p className="text-red-500 text-xs mt-1 flex items-center">
+                      <FaExclamationTriangle className="w-3 h-3 mr-1" />
+                      {errors.name}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2 flex items-center">
@@ -523,12 +638,20 @@ const CNFList = () => {
                     value={editingCNF.contact || ''}
                     onChange={(e) => setEditingCNF({...editingCNF, contact: e.target.value})}
                     className={`w-full rounded-xl border-2 px-4 py-3 transition-all duration-200 focus:ring-2 focus:ring-[#f85924] focus:border-transparent ${
+                      errors.contact ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                    } ${
                       isDark 
                         ? 'bg-cyan-800 border-cyan-600 text-white placeholder-cyan-400' 
                         : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
                     }`}
                     placeholder="Enter contact number"
                   />
+                  {errors.contact && (
+                    <p className="text-red-500 text-xs mt-1 flex items-center">
+                      <FaExclamationTriangle className="w-3 h-3 mr-1" />
+                      {errors.contact}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2 flex items-center">
@@ -540,12 +663,20 @@ const CNFList = () => {
                     onChange={(e) => setEditingCNF({...editingCNF, address: e.target.value})}
                     rows="3"
                     className={`w-full rounded-xl border-2 px-4 py-3 transition-all duration-200 focus:ring-2 focus:ring-[#f85924] focus:border-transparent ${
+                      errors.address ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                    } ${
                       isDark 
                         ? 'bg-cyan-800 border-cyan-600 text-white placeholder-cyan-400' 
                         : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
                     }`}
                     placeholder="Enter CNF address"
                   />
+                  {errors.address && (
+                    <p className="text-red-500 text-xs mt-1 flex items-center">
+                      <FaExclamationTriangle className="w-3 h-3 mr-1" />
+                      {errors.address}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2 flex items-center">
@@ -557,11 +688,19 @@ const CNFList = () => {
                     value={formatDate(editingCNF.establishedAt)}
                     onChange={(e) => setEditingCNF({...editingCNF, establishedAt: e.target.value})}
                     className={`w-full rounded-xl border-2 px-4 py-3 transition-all duration-200 focus:ring-2 focus:ring-[#f85924] focus:border-transparent ${
+                      errors.establishedAt ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                    } ${
                       isDark 
                         ? 'bg-cyan-800 border-cyan-600 text-white placeholder-cyan-400' 
                         : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
                     }`}
                   />
+                  {errors.establishedAt && (
+                    <p className="text-red-500 text-xs mt-1 flex items-center">
+                      <FaExclamationTriangle className="w-3 h-3 mr-1" />
+                      {errors.establishedAt}
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -619,6 +758,20 @@ const CNFList = () => {
                 </p>
               </div>
             </div>
+
+            {/* Error Display */}
+            {errors.delete && (
+              <div className={`mb-4 p-3 rounded-xl border ${
+                isDark 
+                  ? 'bg-red-900/20 border-red-700 text-red-300' 
+                  : 'bg-red-50 border-red-200 text-red-700'
+              }`}>
+                <div className="flex items-center">
+                  <FaExclamationTriangle className="w-4 h-4 mr-2" />
+                  {errors.delete}
+                </div>
+              </div>
+            )}
             
             <div className="mb-6">
               <p className="mb-4">

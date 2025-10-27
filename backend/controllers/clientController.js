@@ -1,6 +1,7 @@
 // controllers/clientController.js
 const { Client } = require('../models');
 const { Op } = require('sequelize');
+const { sequelize } = require('../models');
 
 // 🔍 Get all clients with pagination and filtering
 exports.getClients = async (req, res) => {

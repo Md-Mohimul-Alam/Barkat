@@ -1,4 +1,3 @@
-// models/Employee.js
 'use strict';
 
 module.exports = (sequelize, DataTypes) => {
@@ -42,7 +41,10 @@ module.exports = (sequelize, DataTypes) => {
     email: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
+      unique: {
+        name: 'employees_email_unique',
+        msg: 'Employee with this email already exists'
+      },
       validate: {
         isEmail: { msg: 'Please enter a valid email' },
         notEmpty: { msg: 'Email is required' }
@@ -51,7 +53,10 @@ module.exports = (sequelize, DataTypes) => {
     nid: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
+      unique: {
+        name: 'employees_nid_unique',
+        msg: 'Employee with this NID already exists'
+      },
       validate: {
         notEmpty: { msg: 'NID number is required' },
         is: { args: /^[0-9]{10,17}$/, msg: 'NID must be 10-17 digits' }
@@ -62,7 +67,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       validate: {
         isDate: { msg: 'Please enter a valid date of birth' },
-        notEmpty: { msg: 'Date of birth is required' }
+        notEmpty: { msg: 'Date of birth is required' },
+        isBefore: {
+          args: new Date().toISOString(),
+          msg: 'Date of birth must be in the past'
+        }
       }
     },
     address: {
@@ -70,14 +79,21 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       validate: {
         notEmpty: { msg: 'Address is required' },
-        len: { args: [1, 500], msg: 'Address cannot exceed 500 characters' }
+        len: { args: [10, 500], msg: 'Address must be between 10 and 500 characters' }
       }
     },
     salary: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
       validate: {
-        min: { args: [0], msg: 'Salary cannot be negative' },
+        min: { 
+          args: [0], 
+          msg: 'Salary cannot be negative' 
+        },
+        max: {
+          args: [99999999.99],
+          msg: 'Salary cannot exceed 99,999,999.99'
+        },
         notEmpty: { msg: 'Salary is required' }
       }
     },
@@ -86,7 +102,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       validate: {
         isDate: { msg: 'Please enter a valid join date' },
-        notEmpty: { msg: 'Join date is required' }
+        notEmpty: { msg: 'Join date is required' },
+        isBefore: {
+          args: new Date().toISOString(),
+          msg: 'Join date cannot be in the future'
+        }
       }
     },
     branchId: {
@@ -95,18 +115,51 @@ module.exports = (sequelize, DataTypes) => {
       references: {
         model: 'branches',
         key: 'id'
+      },
+      validate: {
+        notEmpty: { msg: 'Branch selection is required' }
       }
     },
     status: {
       type: DataTypes.ENUM('active', 'inactive', 'on-leave'),
       defaultValue: 'active',
       validate: {
-        isIn: { args: [['active', 'inactive', 'on-leave']], msg: 'Invalid status' }
+        isIn: { 
+          args: [['active', 'inactive', 'on-leave']], 
+          msg: 'Status must be either active, inactive, or on-leave' 
+        }
       }
+    },
+    isManager: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false
     }
   }, {
     tableName: 'employees',
     timestamps: true,
+    indexes: [
+      {
+        fields: ['email'],
+        unique: true
+      },
+      {
+        fields: ['nid'],
+        unique: true
+      },
+      {
+        fields: ['branchId']
+      },
+      {
+        fields: ['isManager']
+      },
+      {
+        fields: ['status']
+      },
+      {
+        fields: ['position']
+      }
+    ],
     hooks: {
       beforeValidate: (employee) => {
         // Trim string fields
@@ -116,6 +169,81 @@ module.exports = (sequelize, DataTypes) => {
         if (employee.whatsapp) employee.whatsapp = employee.whatsapp.trim();
         if (employee.address) employee.address = employee.address.trim();
         if (employee.email) employee.email = employee.email.toLowerCase().trim();
+        if (employee.nid) employee.nid = employee.nid.trim();
+        
+        // Validate dates
+        if (employee.dob && employee.joinedAt) {
+          const dob = new Date(employee.dob);
+          const joinDate = new Date(employee.joinedAt);
+          
+          if (joinDate < dob) {
+            throw new Error('Join date cannot be before date of birth');
+          }
+          
+          // Validate employee is at least 18 years old
+          const age = new Date().getFullYear() - dob.getFullYear();
+          const monthDiff = new Date().getMonth() - dob.getMonth();
+          const actualAge = monthDiff < 0 || (monthDiff === 0 && new Date().getDate() < dob.getDate()) ? age - 1 : age;
+          
+          if (actualAge < 18) {
+            throw new Error('Employee must be at least 18 years old');
+          }
+        }
+      },
+      
+      afterCreate: async (employee, options) => {
+        if (employee.isManager) {
+          const { Branch } = sequelize.models;
+          try {
+            await Branch.update(
+              { managerId: employee.id },
+              { 
+                where: { id: employee.branchId },
+                transaction: options.transaction 
+              }
+            );
+            console.log(`✅ Employee ${employee.id} assigned as manager for branch ${employee.branchId}`);
+          } catch (error) {
+            console.error('❌ Error assigning manager to branch:', error);
+          }
+        }
+      },
+      
+      afterUpdate: async (employee, options) => {
+        const { Branch } = sequelize.models;
+        
+        if (employee.changed('isManager') && employee.isManager) {
+          try {
+            await Branch.update(
+              { managerId: employee.id },
+              { 
+                where: { id: employee.branchId },
+                transaction: options.transaction 
+              }
+            );
+            console.log(`✅ Employee ${employee.id} assigned as manager for branch ${employee.branchId}`);
+          } catch (error) {
+            console.error('❌ Error assigning manager to branch:', error);
+          }
+        }
+        
+        if (employee.changed('isManager') && !employee.isManager) {
+          try {
+            await Branch.update(
+              { managerId: null },
+              { 
+                where: { 
+                  id: employee.branchId,
+                  managerId: employee.id 
+                },
+                transaction: options.transaction 
+              }
+            );
+            console.log(`✅ Employee ${employee.id} removed as manager from branch ${employee.branchId}`);
+          } catch (error) {
+            console.error('❌ Error removing manager from branch:', error);
+          }
+        }
       }
     }
   });
@@ -124,38 +252,13 @@ module.exports = (sequelize, DataTypes) => {
   Employee.associate = function(models) {
     Employee.belongsTo(models.Branch, {
       foreignKey: 'branchId',
-      as: 'branch',
-      onDelete: 'RESTRICT',
-      onUpdate: 'CASCADE'
+      as: 'branch'
     });
-  };
-
-  // Instance methods
-  Employee.prototype.getAge = function() {
-    if (!this.dob) return null;
-    const today = new Date();
-    const birthDate = new Date(this.dob);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    return age;
-  };
-
-  Employee.prototype.getEmploymentDuration = function() {
-    if (!this.joinedAt) return null;
-    const join = new Date(this.joinedAt);
-    const today = new Date();
-    const diffTime = Math.abs(today - join);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    const years = Math.floor(diffDays / 365);
-    const months = Math.floor((diffDays % 365) / 30);
     
-    if (years > 0) {
-      return `${years} year${years > 1 ? 's' : ''}${months > 0 ? `, ${months} month${months > 1 ? 's' : ''}` : ''}`;
-    }
-    return `${months} month${months > 1 ? 's' : ''}`;
+    Employee.hasOne(models.Branch, {
+      foreignKey: 'managerId',
+      as: 'managedBranch'
+    });
   };
 
   return Employee;

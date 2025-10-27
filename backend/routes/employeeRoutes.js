@@ -1,33 +1,21 @@
-// routes/employeeRoutes.js
 const express = require('express');
 const router = express.Router();
+const employeeController = require('../controllers/employeeController');
+const { authenticate, authorize } = require('../middleware/auth');
 
-// Import middleware
-const { authorizeRoles } = require('../middlewares/auth');
+// All routes require authentication
+router.use(authenticate);
 
-// Import validation - FIX: Import validateBulkUpdate
-const { 
-  validateEmployee, 
-  validateEmployeeUpdate, 
-  validateBulkUpdate 
-} = require('../middlewares/validation');
+// Employee routes
+router.get('/', employeeController.getAllEmployees);
+router.get('/stats/overview', employeeController.getEmployeeStats);
+router.get('/managers', employeeController.getManagers);
+router.get('/branch/:branchId', employeeController.getEmployeesByBranch);
+router.get('/:id', employeeController.getEmployeeById);
 
-// Import controllers
-const {
-  getAllEmployees,
-  getEmployeeById,
-  createEmployee,
-  updateEmployee,
-  deleteEmployee,
-  bulkUpdateEmployees
-} = require('../controllers/employeeController');
-
-// Apply routes
-router.get('/', authorizeRoles('admin', 'manager', 'user'), getAllEmployees);
-router.get('/:id', authorizeRoles('admin', 'manager', 'user'), getEmployeeById);
-router.post('/', authorizeRoles('admin', 'manager'), validateEmployee, createEmployee);
-router.put('/:id', authorizeRoles('admin', 'manager'), validateEmployeeUpdate, updateEmployee);
-router.delete('/:id', authorizeRoles('admin'), deleteEmployee);
-router.patch('/bulk', authorizeRoles('admin', 'manager'), validateBulkUpdate, bulkUpdateEmployees);
+router.post('/', employeeController.createEmployee);
+router.put('/:id', employeeController.updateEmployee);
+router.patch('/bulk', authorize(['admin', 'manager']), employeeController.bulkUpdateEmployees);
+router.delete('/:id', authorize(['admin', 'manager']), employeeController.deleteEmployee);
 
 module.exports = router;

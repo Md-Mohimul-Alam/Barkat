@@ -1,113 +1,138 @@
-// server.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { sequelize } = require('./models');
-const authRoutes = require('./routes/auth');
-const branchRoutes = require('./routes/branchRoutes');
-const clientRoute = require('./routes/clientRoute');
-const cnfsRoutes = require('./routes/cnfRoutes');
-const employeeRoutes = require('./routes/employeeRoutes');
-const transportRoutes = require('./routes/transportRoutes');
-const { authenticate, authorizeRoles } = require('./middlewares/auth');
 
 const app = express();
+const PORT = process.env.PORT || 5050;
 
-// ✅ CORS configuration
-const corsOptions = {
+console.log('🚀 Starting MBTS Backend Server...');
+
+// 1. Basic middleware
+app.use(cors({
   origin: 'http://localhost:5173',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-};
+  credentials: true
+}));
 
-app.use(cors(corsOptions));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// ✅ Public Routes (no authentication required)
-app.use('/api/auth', authRoutes);
-
-// ✅ Apply authentication middleware to ALL protected routes
-app.use(authenticate); // This runs for all routes below
-
-// ✅ Protected Routes (authentication required)
-app.use('/api/branches', branchRoutes);
-app.use('/api/clients', clientRoute);
-app.use('/api/cnfs', cnfsRoutes);
-app.use('/api/employees', employeeRoutes);
-app.use('/api/transport', transportRoutes);
-
-// ✅ Protected test routes (already have authenticate middleware)
-app.get(
-  '/api/dashboard',
-  authorizeRoles('admin-dashboard', 'manager-dashboard', 'employee-dashboard'),
-  (req, res) => {
-    res.json({
-      message: `Welcome ${req.user.name} to your dashboard!`,
-      role: req.user.role
-    });
-  }
-);
-
-app.get('/api/admin/data', authorizeRoles('admin-dashboard'), (req, res) => {
-  res.json({ message: 'Admin access granted.', stats: { users: 10, branches: 3 } });
-});
-
-// ✅ Health check (public)
+// 2. Basic routes
 app.get('/', (req, res) => {
-  res.send('🚀 MBTSMS backend running...');
+  res.json({ 
+    message: '🚀 MBTSMS Backend API is running!',
+    timestamp: new Date().toISOString(),
+    status: 'operational'
+  });
 });
 
-// ✅ Database connection test endpoint (public)
 app.get('/api/db-status', async (req, res) => {
   try {
     await sequelize.authenticate();
     res.json({
+      success: true,
       status: 'connected',
       database: sequelize.config.database,
-      host: sequelize.config.host
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
     res.status(500).json({
+      success: false,
       status: 'disconnected',
-      error: error.message
+      error: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 });
 
-const PORT = process.env.PORT || 5050;
+console.log('✅ Basic middleware and routes loaded');
 
-// ✅ Start server safely (no data wipe on restart)
+// 3. Public routes (NO authentication)
+const authRoutes = require('./routes/authRoutes');
+app.use('/api/auth', authRoutes);
+console.log('✅ Auth routes loaded');
+
+// ✅ FIX: Create authentication middleware that only applies to specific routes
+const { authenticate } = require('./middleware/auth');
+
+// 4. Protected routes - apply authentication individually
+const userRoutes = require('./routes/userRoutes');
+app.use('/api/users', authenticate, userRoutes);
+console.log('✅ User routes loaded');
+
+const branchRoutes = require('./routes/branchRoutes');
+app.use('/api/branches', authenticate, branchRoutes);
+console.log('✅ Branch routes loaded');
+
+const clientRoutes = require('./routes/clientRoutes');
+app.use('/api/clients', authenticate, clientRoutes);
+console.log('✅ Client routes loaded');
+
+const cnfRoutes = require('./routes/cnfRoutes');
+app.use('/api/cnfs', authenticate, cnfRoutes);
+console.log('✅ CNF routes loaded');
+
+const employeeRoutes = require('./routes/employeeRoutes');
+app.use('/api/employees', authenticate, employeeRoutes);
+console.log('✅ Employee routes loaded');
+
+const transportRoutes = require('./routes/transportRoutes');
+app.use('/api/transport', authenticate, transportRoutes);
+console.log('✅ Transport routes loaded');
+
+// 5. Test protected route
+app.get('/api/protected-test', authenticate, (req, res) => {
+  res.json({
+    success: true,
+    message: 'Protected route accessed successfully',
+    user: req.user,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 6. Error handling
+app.use((error, req, res, next) => {
+  console.error('❌ Error:', error);
+  res.status(500).json({
+    success: false,
+    message: 'Internal server error',
+    error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 7. 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 8. Start server
 const startServer = async () => {
   try {
-    console.log('🔄 Attempting to connect to PostgreSQL...');
-
+    console.log('🔄 Connecting to database...');
     await sequelize.authenticate();
-    console.log('✅ Connected to PostgreSQL');
-    console.log(`📊 Database: ${sequelize.config.database}`);
-    console.log(`🏠 Host: ${sequelize.config.host}`);
-
-    console.log(`🔧 Running Sequelize sync in ${process.env.NODE_ENV || 'development'} mode...`);
-
-    // ⚠️ Safe sync (no data deletion)
-    if (process.env.NODE_ENV === 'development') {
-      // In development: alter tables without dropping
-      await sequelize.sync({ alter: true });
-      console.log('✅ Database synchronized with alter:true (non-destructive)');
-    } else {
-      // In production: no table changes, data stays safe
-      await sequelize.sync();
-      console.log('✅ Database synchronized (no schema change)');
-    }
-
-    // Start server
+    console.log('✅ Database connected successfully');
+    
+    await sequelize.sync({ force: false, alter: false });
+    console.log('✅ Database synchronized');
+    
     app.listen(PORT, () => {
-      console.log(`🚀 Backend server running on http://localhost:${PORT}`);
+      console.log(`\n🎉 Server successfully started on http://localhost:${PORT}`);
+      console.log('📋 Available endpoints:');
+      console.log('   GET  /              - Health check');
+      console.log('   GET  /api/db-status - Database status');
+      console.log('   POST /api/auth/login - User login');
+      console.log('   POST /api/auth/register - User registration');
+      console.log('   GET  /api/protected-test - Test protected route');
+      console.log('\n✨ Server is ready to accept requests!');
     });
-
+    
   } catch (error) {
-    console.error('❌ Database connection failed:');
-    console.error('Error details:', error.message);
+    console.error('❌ Server startup failed:', error.message);
     process.exit(1);
   }
 };

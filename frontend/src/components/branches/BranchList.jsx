@@ -1,14 +1,15 @@
-// src/components/branches/BranchList.jsx
-import React, { useEffect, useState } from 'react';
-import { FaEdit, FaTrash, FaPlus, FaBuilding, FaUser, FaPhone, FaMapMarker, FaCalendar, FaSpinner, FaSearch, FaFilter } from 'react-icons/fa';
+import React, { useEffect, useState, useCallback } from 'react';
+import { FaEdit, FaTrash, FaPlus, FaBuilding, FaUser, FaPhone, FaMapMarker, FaCalendar, FaSpinner, FaSearch, FaCrown, FaExclamationTriangle, FaSyncAlt } from 'react-icons/fa';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import branchService from '../../services/branchService';
+import employeeService from '../../services/employeeService';
 import TopBar from '../shared/Topbar';
 import SidebarWrapper from '../shared/Sidebar';
 import Footer from '../shared/Footer';
 import { notifyError, notifySuccess } from '../../pages/UI/Toast';
 import { useNavigate } from 'react-router-dom';
+import BranchForm from './BranchForm';
 
 const BranchList = () => {
   const { theme } = useTheme();
@@ -18,6 +19,7 @@ const BranchList = () => {
   
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [branches, setBranches] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -25,38 +27,27 @@ const BranchList = () => {
   const [deletingId, setDeletingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [errors, setErrors] = useState({});
 
   const handleToggleSidebar = () => setSidebarCollapsed(prev => !prev);
 
-  useEffect(() => {
-    fetchBranches();
-  }, []);
-
-  const fetchBranches = async () => {
+  const fetchBranches = useCallback(async () => {
     try {
       setLoading(true);
+      setErrors({});
       console.log('🔧 Fetching branches...');
       
       const response = await branchService.getBranches();
       console.log('🔧 Branches API response:', response);
       
-      // Handle different response formats
+      // Handle response format
       let branchesData = [];
       
-      if (Array.isArray(response)) {
-        // Direct array response
+      if (response && response.success && Array.isArray(response.data)) {
+        branchesData = response.data;
+      } else if (Array.isArray(response)) {
         branchesData = response;
       } else if (response && Array.isArray(response.data)) {
-        // Wrapped in data property
-        branchesData = response.data;
-      } else if (response && response.data && Array.isArray(response.data.branches)) {
-        // Nested branches array
-        branchesData = response.data.branches;
-      } else if (response && response.branches) {
-        // Direct branches property
-        branchesData = response.branches;
-      } else if (response && response.success && Array.isArray(response.data)) {
-        // Success wrapper with data array
         branchesData = response.data;
       } else {
         console.warn('Unexpected branches response format:', response);
@@ -68,15 +59,43 @@ const BranchList = () => {
       
     } catch (err) {
       console.error('Error fetching branches:', err);
+      setErrors({ fetch: err.message || 'Failed to load branches' });
       notifyError(err.message || 'Failed to load branches');
-      setBranches([]); // Ensure it's always an array
+      setBranches([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const fetchAllEmployees = useCallback(async () => {
+    try {
+      const response = await employeeService.getEmployees();
+      let employeesData = [];
+      
+      if (response && response.success && Array.isArray(response.data)) {
+        employeesData = response.data;
+      } else if (Array.isArray(response)) {
+        employeesData = response;
+      } else if (response && Array.isArray(response.data)) {
+        employeesData = response.data;
+      }
+      
+      console.log('🔧 Employees data for manager selection:', employeesData);
+      setEmployees(employeesData);
+    } catch (err) {
+      console.error('Error fetching employees:', err);
+      setErrors(prev => ({ ...prev, employees: 'Failed to load employees' }));
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchBranches();
+    fetchAllEmployees();
+  }, [fetchBranches, fetchAllEmployees]);
 
   const handleEditBranch = (branch) => {
     setEditingBranch({...branch});
+    setErrors({});
     setEditModalOpen(true);
   };
 
@@ -84,17 +103,46 @@ const BranchList = () => {
     if (!editingBranch) return;
 
     setSaveLoading(true);
+    setErrors({});
     try {
-      await branchService.updateBranch(editingBranch.id, editingBranch);
+      console.log('🔄 Saving branch with ID:', editingBranch.id, 'Data:', editingBranch);
+      
+      // Prepare data for backend
+      const updateData = {
+        name: editingBranch.name,
+        contact: editingBranch.contact,
+        address: editingBranch.address,
+        managerId: editingBranch.managerId || null
+      };
+
+      console.log('📤 Sending update data:', updateData);
+      
+      // Call the update service
+      const response = await branchService.updateBranch(editingBranch.id, updateData);
+      console.log('✅ Branch update response:', response);
+
+      // Handle different response formats
+      let updatedBranch;
+      if (response && response.success && response.data) {
+        updatedBranch = response.data;
+      } else if (response && response.id) {
+        updatedBranch = response;
+      } else {
+        updatedBranch = response;
+      }
+
+      // Update local state
       setBranches(prev => prev.map(branch => 
-        branch.id === editingBranch.id ? editingBranch : branch
+        branch.id === editingBranch.id ? updatedBranch : branch
       ));
+      
       setEditModalOpen(false);
       setEditingBranch(null);
       notifySuccess('Branch updated successfully');
     } catch (err) {
-      console.error(err);
-      notifyError('Failed to update branch');
+      console.error('❌ Error updating branch:', err);
+      setErrors({ save: err.message });
+      notifyError(err.message || 'Failed to update branch');
     } finally {
       setSaveLoading(false);
     }
@@ -106,12 +154,14 @@ const BranchList = () => {
     }
 
     setDeletingId(branchId);
+    setErrors({});
     try {
       await branchService.deleteBranch(branchId);
       setBranches(prev => prev.filter(branch => branch.id !== branchId));
       notifySuccess('Branch deleted successfully');
     } catch (err) {
       console.error(err);
+      setErrors({ delete: err.message });
       notifyError('Failed to delete branch');
     } finally {
       setDeletingId(null);
@@ -121,6 +171,7 @@ const BranchList = () => {
   const handleCloseEditModal = () => {
     setEditModalOpen(false);
     setEditingBranch(null);
+    setErrors({});
   };
 
   const handleSort = (key) => {
@@ -138,7 +189,7 @@ const BranchList = () => {
       const searchLower = searchTerm.toLowerCase();
       return (
         (branch.name?.toLowerCase() || '').includes(searchLower) ||
-        (branch.manager?.toLowerCase() || '').includes(searchLower) ||
+        (branch.manager?.name?.toLowerCase() || '').includes(searchLower) ||
         (branch.contact?.toLowerCase() || '').includes(searchLower) ||
         (branch.address?.toLowerCase() || '').includes(searchLower)
       );
@@ -146,8 +197,14 @@ const BranchList = () => {
     .sort((a, b) => {
       if (!sortConfig.key) return 0;
       
-      const aValue = a[sortConfig.key];
-      const bValue = b[sortConfig.key];
+      let aValue = a[sortConfig.key];
+      let bValue = b[sortConfig.key];
+      
+      // Handle nested properties for manager name
+      if (sortConfig.key === 'manager') {
+        aValue = a.manager?.name;
+        bValue = b.manager?.name;
+      }
       
       if (aValue < bValue) {
         return sortConfig.direction === 'asc' ? -1 : 1;
@@ -173,9 +230,25 @@ const BranchList = () => {
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     try {
-      return dateString.split('T')[0];
+      return new Date(dateString).toISOString().split('T')[0];
     } catch {
       return dateString;
+    }
+  };
+
+  // Test API connection
+  const testApiConnection = async () => {
+    try {
+      setLoading(true);
+      const response = await branchService.testBranches();
+      console.log('✅ Test API response:', response);
+      notifySuccess('API connection successful!');
+      fetchBranches(); // Refresh branches after test
+    } catch (error) {
+      console.error('❌ Test API failed:', error);
+      notifyError('API connection failed: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -186,6 +259,25 @@ const BranchList = () => {
         <TopBar onToggleSidebar={handleToggleSidebar} sidebarCollapsed={sidebarCollapsed} />
 
         <div className="p-6 flex-1">
+          {/* Error Banner */}
+          {errors.fetch && (
+            <div className={`mb-6 p-4 rounded-xl border flex items-center ${
+              isDark 
+                ? 'bg-red-900/20 border-red-700 text-red-300' 
+                : 'bg-red-50 border-red-200 text-red-700'
+            }`}>
+              <FaExclamationTriangle className="w-5 h-5 mr-2" />
+              {errors.fetch}
+              <button 
+                onClick={fetchBranches}
+                className="ml-auto px-3 py-1 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors flex items-center"
+              >
+                <FaSyncAlt className="w-3 h-3 mr-1" />
+                Retry
+              </button>
+            </div>
+          )}
+
           {/* Header Section */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
             <div className="flex items-center">
@@ -213,6 +305,25 @@ const BranchList = () => {
                   }`}
                 />
               </div>
+              
+              {/* Test API Button */}
+              <button
+                onClick={testApiConnection}
+                disabled={loading}
+                className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center ${
+                  isDark
+                    ? 'bg-yellow-600 hover:bg-yellow-700 text-white disabled:opacity-50'
+                    : 'bg-yellow-500 hover:bg-yellow-600 text-white disabled:opacity-50'
+                }`}
+              >
+                {loading ? (
+                  <FaSpinner className="animate-spin w-4 h-4 mr-2" />
+                ) : (
+                  <FaSyncAlt className="w-4 h-4 mr-2" />
+                )}
+                Test API
+              </button>
+
               <button
                 onClick={() => navigate('/app/branches/add')}
                 className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center shadow-lg hover:shadow-xl ${
@@ -224,6 +335,54 @@ const BranchList = () => {
                 <FaPlus className="w-4 h-4 mr-2" />
                 Add Branch
               </button>
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className={`rounded-xl p-4 ${isDark ? 'bg-cyan-800' : 'bg-blue-50'}`}>
+              <div className="flex items-center">
+                <div className={`p-2 rounded-lg mr-3 ${isDark ? 'bg-cyan-700' : 'bg-blue-100'}`}>
+                  <FaBuilding className={isDark ? 'text-cyan-300' : 'text-blue-600'} />
+                </div>
+                <div>
+                  <p className={`text-sm ${isDark ? 'text-cyan-300' : 'text-gray-600'}`}>Total Branches</p>
+                  <p className="text-xl font-bold">{branches.length}</p>
+                </div>
+              </div>
+            </div>
+            <div className={`rounded-xl p-4 ${isDark ? 'bg-green-800' : 'bg-green-50'}`}>
+              <div className="flex items-center">
+                <div className={`p-2 rounded-lg mr-3 ${isDark ? 'bg-green-700' : 'bg-green-100'}`}>
+                  <FaBuilding className={isDark ? 'text-green-300' : 'text-green-600'} />
+                </div>
+                <div>
+                  <p className={`text-sm ${isDark ? 'text-green-300' : 'text-gray-600'}`}>Active Branches</p>
+                  <p className="text-xl font-bold">{branches.filter(b => b.status === 'active').length}</p>
+                </div>
+              </div>
+            </div>
+            <div className={`rounded-xl p-4 ${isDark ? 'bg-purple-800' : 'bg-purple-50'}`}>
+              <div className="flex items-center">
+                <div className={`p-2 rounded-lg mr-3 ${isDark ? 'bg-purple-700' : 'bg-purple-100'}`}>
+                  <FaUser className={isDark ? 'text-purple-300' : 'text-purple-600'} />
+                </div>
+                <div>
+                  <p className={`text-sm ${isDark ? 'text-purple-300' : 'text-gray-600'}`}>With Managers</p>
+                  <p className="text-xl font-bold">{branches.filter(b => b.manager).length}</p>
+                </div>
+              </div>
+            </div>
+            <div className={`rounded-xl p-4 ${isDark ? 'bg-yellow-800' : 'bg-yellow-50'}`}>
+              <div className="flex items-center">
+                <div className={`p-2 rounded-lg mr-3 ${isDark ? 'bg-yellow-700' : 'bg-yellow-100'}`}>
+                  <FaCalendar className={isDark ? 'text-yellow-300' : 'text-yellow-600'} />
+                </div>
+                <div>
+                  <p className={`text-sm ${isDark ? 'text-yellow-300' : 'text-gray-600'}`}>Established</p>
+                  <p className="text-xl font-bold">{new Date().getFullYear()}</p>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -299,12 +458,35 @@ const BranchList = () => {
                     >
                       <td className="p-4">
                         <div className="font-semibold">{branch.name || 'N/A'}</div>
+                        <div className={`text-xs mt-1 ${isDark ? 'text-cyan-400' : 'text-gray-500'}`}>
+                          Status: <span className={`font-medium ${
+                            branch.status === 'active' 
+                              ? isDark ? 'text-green-400' : 'text-green-600'
+                              : isDark ? 'text-red-400' : 'text-red-600'
+                          }`}>
+                            {branch.status || 'active'}
+                          </span>
+                        </div>
                       </td>
                       <td className="p-4">
                         <div className="flex items-center">
                           <FaUser className={`w-3 h-3 mr-2 ${isDark ? 'text-cyan-400' : 'text-gray-400'}`} />
-                          {branch.manager || 'N/A'}
+                          {branch.manager ? (
+                            <div className="flex items-center">
+                              <span className="font-medium">{branch.manager.name}</span>
+                              {branch.manager.position?.toLowerCase().includes('manager') && (
+                                <FaCrown className="w-3 h-3 ml-1 text-yellow-500" title="Manager" />
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-500 italic">No manager assigned</span>
+                          )}
                         </div>
+                        {branch.manager && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {branch.manager.position} • {branch.manager.contact}
+                          </div>
+                        )}
                       </td>
                       <td className="p-4">
                         <div className="flex items-center">
@@ -411,127 +593,12 @@ const BranchList = () => {
 
       {/* Edit Branch Modal */}
       {editModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className={`rounded-2xl p-6 w-full max-w-md shadow-2xl ${
-            isDark ? 'bg-gradient-to-br from-cyan-900 to-sky-900 text-white border border-cyan-700' : 'bg-white text-gray-900 border border-gray-200'
-          }`}>
-            <div className="flex items-center mb-6">
-              <div className={`p-3 rounded-xl mr-4 ${
-                isDark ? 'bg-cyan-800' : 'bg-orange-100'
-              }`}>
-                <FaEdit className={`w-6 h-6 ${isDark ? 'text-cyan-300' : 'text-[#f85924]'}`} />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold">Edit Branch</h2>
-                <p className={`text-sm ${isDark ? 'text-cyan-300' : 'text-gray-600'}`}>
-                  Update branch information
-                </p>
-              </div>
-            </div>
-            {editingBranch && (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2 flex items-center">
-                    <FaBuilding className="w-4 h-4 mr-2 text-gray-400" />
-                    Branch Name
-                  </label>
-                  <input
-                    type="text"
-                    value={editingBranch.name || ''}
-                    onChange={(e) => setEditingBranch({...editingBranch, name: e.target.value})}
-                    className={`w-full rounded-xl border-2 px-4 py-3 transition-all duration-200 focus:ring-2 focus:ring-[#f85924] focus:border-transparent ${
-                      isDark 
-                        ? 'bg-cyan-800 border-cyan-600 text-white placeholder-cyan-400' 
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                    }`}
-                    placeholder="Enter branch name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 flex items-center">
-                    <FaUser className="w-4 h-4 mr-2 text-gray-400" />
-                    Manager
-                  </label>
-                  <input
-                    type="text"
-                    value={editingBranch.manager || ''}
-                    onChange={(e) => setEditingBranch({...editingBranch, manager: e.target.value})}
-                    className={`w-full rounded-xl border-2 px-4 py-3 transition-all duration-200 focus:ring-2 focus:ring-[#f85924] focus:border-transparent ${
-                      isDark 
-                        ? 'bg-cyan-800 border-cyan-600 text-white placeholder-cyan-400' 
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                    }`}
-                    placeholder="Enter manager name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 flex items-center">
-                    <FaPhone className="w-4 h-4 mr-2 text-gray-400" />
-                    Contact
-                  </label>
-                  <input
-                    type="text"
-                    value={editingBranch.contact || ''}
-                    onChange={(e) => setEditingBranch({...editingBranch, contact: e.target.value})}
-                    className={`w-full rounded-xl border-2 px-4 py-3 transition-all duration-200 focus:ring-2 focus:ring-[#f85924] focus:border-transparent ${
-                      isDark 
-                        ? 'bg-cyan-800 border-cyan-600 text-white placeholder-cyan-400' 
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                    }`}
-                    placeholder="Enter contact number"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 flex items-center">
-                    <FaMapMarker className="w-4 h-4 mr-2 text-gray-400" />
-                    Address
-                  </label>
-                  <textarea
-                    value={editingBranch.address || ''}
-                    onChange={(e) => setEditingBranch({...editingBranch, address: e.target.value})}
-                    rows="3"
-                    className={`w-full rounded-xl border-2 px-4 py-3 transition-all duration-200 focus:ring-2 focus:ring-[#f85924] focus:border-transparent ${
-                      isDark 
-                        ? 'bg-cyan-800 border-cyan-600 text-white placeholder-cyan-400' 
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                    }`}
-                    placeholder="Enter branch address"
-                  />
-                </div>
-              </div>
-            )}
-            <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-700">
-              <button
-                onClick={handleCloseEditModal}
-                disabled={saveLoading}
-                className={`px-6 py-3 rounded-xl font-semibold transition-all duration-200 border-2 ${
-                  isDark 
-                    ? 'border-cyan-600 text-cyan-300 hover:bg-cyan-800 disabled:opacity-50' 
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50'
-                }`}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveBranch}
-                disabled={saveLoading}
-                className="px-6 py-3 bg-gradient-to-r from-[#f85924] to-[#e84a1a] text-white rounded-xl font-semibold transition-all duration-200 hover:from-[#e84a1a] hover:to-[#d13602] shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:opacity-50 flex items-center"
-              >
-                {saveLoading ? (
-                  <>
-                    <FaSpinner className="animate-spin w-4 h-4 mr-2" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <FaEdit className="w-4 h-4 mr-2" />
-                    Save Changes
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+        <BranchForm
+          isEdit={true}
+          branchData={editingBranch}
+          onClose={handleCloseEditModal}
+          onSave={handleSaveBranch}
+        />
       )}
     </div>
   );

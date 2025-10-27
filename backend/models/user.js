@@ -32,10 +32,14 @@ module.exports = (sequelize, DataTypes) => {
       }
     },
     role: {
-      type: DataTypes.STRING,
+      type: DataTypes.ENUM('admin', 'manager', 'employee'),
       allowNull: false,
       validate: {
-        notEmpty: { msg: 'Role is required' }
+        notEmpty: { msg: 'Role is required' },
+        isIn: {
+          args: [['admin', 'manager', 'employee']],
+          msg: 'Role must be admin, manager, or employee'
+        }
       }
     },
     status: {
@@ -47,6 +51,24 @@ module.exports = (sequelize, DataTypes) => {
     timestamps: true,
     freezeTableName: true
   });
+
+  // Associations
+  User.associate = function(models) {
+    User.hasMany(models.Branch, {
+      foreignKey: 'createdBy',
+      as: 'createdBranches'
+    });
+    
+    User.hasMany(models.Branch, {
+      foreignKey: 'updatedBy',
+      as: 'updatedBranches'
+    });
+    
+    User.hasMany(models.Employee, {
+      foreignKey: 'createdBy',
+      as: 'createdEmployees'
+    });
+  };
 
   return User;
 };

@@ -36,13 +36,16 @@ const ClientList = () => {
   const fetchClients = async () => {
     try {
       setLoading(true);
-      const data = await clientService.getClients();
+      const response = await clientService.getClients();
       
-      // Data should now be the array directly
-      if (data && Array.isArray(data)) {
-        setClients(data);
+      // Extract the clients array from the response
+      if (response && response.clients && Array.isArray(response.clients)) {
+        setClients(response.clients);
+      } else if (response && Array.isArray(response)) {
+        // Fallback: if it's already an array (for backward compatibility)
+        setClients(response);
       } else {
-        console.error('Unexpected data format:', data);
+        console.error('Unexpected data format:', response);
         setClients([]);
         notifyError('Invalid data format received');
       }

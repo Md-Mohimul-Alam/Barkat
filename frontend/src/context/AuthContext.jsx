@@ -20,6 +20,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
+        // ✅ FIX: Use getStoredToken() instead of getToken()
         const token = authService.getStoredToken();
         const storedUser = authService.getStoredUser();
         
@@ -31,9 +32,13 @@ export const AuthProvider = ({ children }) => {
           setUser(storedUser);
           
           // Then verify token in background (non-blocking)
-          verifyTokenInBackground(token);
+          verifyTokenInBackground(token, storedUser);
         } else {
           console.log('🔧 No valid token or user found in storage');
+          if (token && !storedUser) {
+            console.warn('⚠️ Token exists but no user data - clearing invalid token');
+            authService.logoutUser();
+          }
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
@@ -43,21 +48,36 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
-    const verifyTokenInBackground = async (token) => {
+    const verifyTokenInBackground = async (token, currentUser) => {
       try {
         console.log('🔧 Verifying token in background...');
         const verificationResponse = await authService.verifyToken();
         
         if (verificationResponse && verificationResponse.valid) {
           console.log('✅ Token verified successfully');
+          
+          // Update user data if verification returned fresh user info
+          if (verificationResponse.user) {
+            console.log('🔄 Updating user data from verification response');
+            setUser(verificationResponse.user);
+            const storage = localStorage.getItem('authToken') ? localStorage : sessionStorage;
+            storage.setItem('user', JSON.stringify(verificationResponse.user)); // ✅ FIX: Changed from 'auth_user' to 'user'
+          }
         } else {
-          console.warn('⚠️ Token verification failed, but keeping user logged in');
-          // Don't logout immediately - let the user continue with potentially expired token
-          // The API calls will fail and handle logout if needed
+          console.warn('⚠️ Token verification failed:', verificationResponse?.message);
+          
+          // Don't logout immediately for missing endpoints
+          if (verificationResponse?.message?.includes('endpoint not available')) {
+            console.log('🔄 Verification endpoint missing, but token appears valid - keeping user logged in');
+            // User remains logged in with existing token
+          } else {
+            console.warn('❌ Token invalid, but keeping session for now');
+            // Invalid token, but let subsequent API calls handle logout
+          }
         }
       } catch (verifyError) {
-        console.warn('⚠️ Token verification error, but keeping user logged in:', verifyError);
-        // Don't logout on verification error - let subsequent API calls handle it
+        console.warn('⚠️ Token verification error, but keeping user logged in:', verifyError.message);
+        // Don't logout on verification errors - let API calls handle authentication failures
       }
     };
 
@@ -119,7 +139,7 @@ export const AuthProvider = ({ children }) => {
     
     // Also update in storage
     const storage = localStorage.getItem('authToken') ? localStorage : sessionStorage;
-    storage.setItem('auth_user', JSON.stringify({
+    storage.setItem('user', JSON.stringify({ // ✅ FIX: Changed from 'auth_user' to 'user'
       ...user,
       ...updatedUserData
     }));

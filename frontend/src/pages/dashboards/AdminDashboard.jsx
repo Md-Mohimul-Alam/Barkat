@@ -69,132 +69,132 @@ const AdminDashboard = () => {
       userData: userData ? JSON.parse(userData) : 'No user data'
     });
   }, []);
+
   // Fetch all dashboard data
-useEffect(() => {
-  const fetchDashboardData = async () => {
-    // Check multiple places for token
-    const tokenFromContext = user?.token;
-    const tokenFromStorage = localStorage.getItem('token');
-    const currentToken = tokenFromContext || tokenFromStorage;
-    
-    console.log('🔍 Token check:', {
-      fromContext: !!tokenFromContext,
-      fromStorage: !!tokenFromStorage,
-      currentToken: currentToken ? '***' + currentToken.slice(-10) : 'No token'
-    });
-
-    if (!currentToken) {
-      console.log('❌ No token available - redirecting to login');
-      setStatsLoading(false);
-      // Optionally redirect to login
-      // navigate('/login');
-      return;
-    }
-    
-    try {
-      setStatsLoading(true);
-      console.log('🔄 Starting dashboard data fetch with token...');
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      // Check multiple places for token
+      const tokenFromContext = user?.token;
+      const tokenFromStorage = localStorage.getItem('token');
+      const currentToken = tokenFromContext || tokenFromStorage;
       
-      // Fetch with timeout to prevent hanging
-      const fetchWithTimeout = (serviceCall, timeout = 10000) => {
-        return Promise.race([
-          serviceCall,
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Request timeout')), timeout)
-          )
-        ]);
-      };
-
-      const [branchesData, cnfsData, clientsData] = await Promise.allSettled([
-        fetchWithTimeout(branchService.getBranches()),
-        fetchWithTimeout(cnfService.getAllCNFs()),
-        fetchWithTimeout(clientService.getClients())
-      ]);
-
-      console.log('📊 Dashboard fetch results:', {
-        branches: branchesData,
-        cnfs: cnfsData,
-        clients: clientsData
+      console.log('🔍 Token check:', {
+        fromContext: !!tokenFromContext,
+        fromStorage: !!tokenFromStorage,
+        currentToken: currentToken ? '***' + currentToken.slice(-10) : 'No token'
       });
 
-      // Handle branches
-      if (branchesData.status === 'fulfilled') {
-        const branchesArray = extractArrayFromResponse(branchesData.value, 'branches');
-        console.log('✅ Branches loaded:', branchesArray.length);
-        setBranches(branchesArray.slice(0, 6));
-      } else {
-        console.error('❌ Branches failed:', branchesData.reason);
-        setBranches([]);
+      if (!currentToken) {
+        console.log('❌ No token available - redirecting to login');
+        setStatsLoading(false);
+        return;
       }
+      
+      try {
+        setStatsLoading(true);
+        console.log('🔄 Starting dashboard data fetch with token...');
+        
+        // Fetch with timeout to prevent hanging
+        const fetchWithTimeout = (serviceCall, timeout = 10000) => {
+          return Promise.race([
+            serviceCall,
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Request timeout')), timeout)
+            )
+          ]);
+        };
 
-      // Handle CNFs
-      if (cnfsData.status === 'fulfilled') {
-        const cnfsArray = extractArrayFromResponse(cnfsData.value, 'cnfs');
-        console.log('✅ CNFs loaded:', cnfsArray.length);
-        setCnfs(cnfsArray.slice(0, 6));
-      } else {
-        console.error('❌ CNFs failed:', cnfsData.reason);
-        setCnfs([]);
+        const [branchesData, cnfsData, clientsData] = await Promise.allSettled([
+          fetchWithTimeout(branchService.getBranches()),
+          fetchWithTimeout(cnfService.getAllCNFs()),
+          fetchWithTimeout(clientService.getClients())
+        ]);
+
+        console.log('📊 Dashboard fetch results:', {
+          branches: branchesData,
+          cnfs: cnfsData,
+          clients: clientsData
+        });
+
+        // Helper function to extract arrays from various response formats
+        const extractArrayFromResponse = (response, type) => {
+          console.log(`🛠️ Extracting ${type} from:`, response);
+          
+          if (!response) {
+            console.log(`❌ No response for ${type}`);
+            return [];
+          }
+          
+          if (Array.isArray(response)) {
+            console.log(`✅ ${type}: Direct array with ${response.length} items`);
+            return response;
+          }
+          
+          if (response.data && Array.isArray(response.data)) {
+            console.log(`✅ ${type}: response.data array with ${response.data.length} items`);
+            return response.data;
+          }
+          
+          if (response[type] && Array.isArray(response[type])) {
+            console.log(`✅ ${type}: response.${type} array with ${response[type].length} items`);
+            return response[type];
+          }
+          
+          if (response.success && response.data && Array.isArray(response.data)) {
+            console.log(`✅ ${type}: response.success.data array with ${response.data.length} items`);
+            return response.data;
+          }
+          
+          if (typeof response === 'object' && response !== null && !Array.isArray(response)) {
+            console.log(`✅ ${type}: Single object, wrapping in array`);
+            return [response];
+          }
+          
+          console.log(`❌ ${type}: Could not extract array from response, returning empty array`);
+          return [];
+        };
+
+        // Handle branches
+        if (branchesData.status === 'fulfilled') {
+          const branchesArray = extractArrayFromResponse(branchesData.value, 'branches');
+          console.log('✅ Branches loaded:', branchesArray.length);
+          setBranches(branchesArray.slice(0, 6));
+        } else {
+          console.error('❌ Branches failed:', branchesData.reason);
+          setBranches([]);
+        }
+
+        // Handle CNFs
+        if (cnfsData.status === 'fulfilled') {
+          const cnfsArray = extractArrayFromResponse(cnfsData.value, 'cnfs');
+          console.log('✅ CNFs loaded:', cnfsArray.length);
+          setCnfs(cnfsArray.slice(0, 6));
+        } else {
+          console.error('❌ CNFs failed:', cnfsData.reason);
+          setCnfs([]);
+        }
+
+        // Handle clients
+        if (clientsData.status === 'fulfilled') {
+          const clientsArray = extractArrayFromResponse(clientsData.value, 'clients');
+          console.log('✅ Clients loaded:', clientsArray.length);
+          setClients(clientsArray.slice(0, 6));
+        } else {
+          console.error('❌ Clients failed:', clientsData.reason);
+          setClients([]);
+        }
+
+      } catch (err) {
+        console.error('💥 Dashboard data fetch error:', err);
+      } finally {
+        console.log('🏁 Dashboard loading complete');
+        setStatsLoading(false);
       }
+    };
 
-      // Handle clients
-      if (clientsData.status === 'fulfilled') {
-        const clientsArray = extractArrayFromResponse(clientsData.value, 'clients');
-        console.log('✅ Clients loaded:', clientsArray.length);
-        setClients(clientsArray.slice(0, 6));
-      } else {
-        console.error('❌ Clients failed:', clientsData.reason);
-        setClients([]);
-      }
+    fetchDashboardData();
+  }, [user?.token, navigate]);
 
-    } catch (err) {
-      console.error('💥 Dashboard data fetch error:', err);
-    } finally {
-      console.log('🏁 Dashboard loading complete');
-      setStatsLoading(false);
-    }
-  };
-
-  // Helper function to extract arrays from various response formats
-  const extractArrayFromResponse = (response, type) => {
-    console.log(`🛠️ Extracting ${type} from:`, response);
-    
-    if (!response) {
-      console.log(`❌ No response for ${type}`);
-      return [];
-    }
-    
-    if (Array.isArray(response)) {
-      console.log(`✅ ${type}: Direct array with ${response.length} items`);
-      return response;
-    }
-    
-    if (response.data && Array.isArray(response.data)) {
-      console.log(`✅ ${type}: response.data array with ${response.data.length} items`);
-      return response.data;
-    }
-    
-    if (response[type] && Array.isArray(response[type])) {
-      console.log(`✅ ${type}: response.${type} array with ${response[type].length} items`);
-      return response[type];
-    }
-    
-    if (response.success && response.data && Array.isArray(response.data)) {
-      console.log(`✅ ${type}: response.success.data array with ${response.data.length} items`);
-      return response.data;
-    }
-    
-    if (typeof response === 'object' && response !== null && !Array.isArray(response)) {
-      console.log(`✅ ${type}: Single object, wrapping in array`);
-      return [response];
-    }
-    
-    console.log(`❌ ${type}: Could not extract array from response, returning empty array`);
-    return [];
-  };
-
-  fetchDashboardData();
-}, [user?.token, navigate]); // Add navigate to dependencies
   // Enhanced Stats with real data integration
   const stats = [
     {

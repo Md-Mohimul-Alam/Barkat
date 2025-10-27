@@ -501,7 +501,7 @@ const SidebarMenu = ({ collapsed, onToggle }) => {
       </Sidebar>
 
       {/* Custom scrollbar styles */}
-      <style jsx>{`
+      <style>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
         }

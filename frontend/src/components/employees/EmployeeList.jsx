@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -9,6 +9,7 @@ import SidebarWrapper from '../shared/Sidebar';
 import Footer from '../shared/Footer';
 import { notifySuccess, notifyError } from '../../pages/UI/Toast';
 import EmployeeForm from './EmployeeForm';
+import { FaExclamationTriangle, FaSyncAlt, FaEdit, FaTrash, FaPlus, FaUser, FaPhone, FaMapMarker, FaCalendar, FaSpinner, FaSearch, FaEye, FaCrown, FaMoneyBillWave, FaTimes } from 'react-icons/fa';
 
 const EmployeeList = () => {
   const { theme } = useTheme();
@@ -28,6 +29,16 @@ const EmployeeList = () => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewingEmployee, setViewingEmployee] = useState(null);
+  const [errors, setErrors] = useState({});
+
+  // Debug state changes
+  useEffect(() => {
+    console.log('🔄 editModalOpen changed:', editModalOpen);
+  }, [editModalOpen]);
+
+  useEffect(() => {
+    console.log('🔄 editingEmployee changed:', editingEmployee);
+  }, [editingEmployee]);
 
   // Connection Status Component
   const ConnectionStatus = () => {
@@ -57,33 +68,27 @@ const EmployeeList = () => {
     return null;
   };
 
-  useEffect(() => {
-    fetchEmployees();
-    fetchBranches();
-  }, []);
-
-  const fetchEmployees = async () => {
+  const fetchEmployees = useCallback(async () => {
     try {
       setLoading(true);
+      setErrors({});
       console.log('🔧 Starting to fetch employees...');
       
       const response = await employeeService.getEmployees();
       console.log('✅ Employees data received:', response);
       
-      // Extract the data array from the response
-      const employeesData = response.data || [];
+      const employeesData = response.data || response || [];
       console.log('📋 Extracted employees array:', employeesData);
       
       setEmployees(employeesData);
     } catch (error) {
       console.error('❌ Failed to fetch employees:', error);
+      setErrors({ fetch: error.message || 'Failed to load employees' });
       
-      // Show specific error messages based on error type
       if (error.message.includes('Cannot connect to server')) {
         notifyError('Backend server is not running. Please start the server on port 5050.');
       } else if (error.message.includes('session has expired')) {
         notifyError('Your session has expired. Please login again.');
-        // Optional: Redirect to login after a delay
         setTimeout(() => navigate('/login'), 2000);
       } else {
         notifyError(error.message || 'Failed to load employees');
@@ -93,11 +98,12 @@ const EmployeeList = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
 
-  const fetchBranches = async () => {
+  const fetchBranches = useCallback(async () => {
     try {
-      const branchesData = await branchService.getBranches();
+      const response = await branchService.getBranches();
+      const branchesData = response.data || response || [];
       const branchesMap = {};
       branchesData.forEach(branch => {
         branchesMap[branch.id || branch._id] = branch.name;
@@ -105,16 +111,26 @@ const EmployeeList = () => {
       setBranches(branchesMap);
     } catch (error) {
       console.error('Failed to fetch branches:', error);
+      setErrors(prev => ({ ...prev, branches: 'Failed to load branches' }));
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchEmployees();
+    fetchBranches();
+  }, [fetchEmployees, fetchBranches]);
 
   const handleAddEmployee = () => {
     navigate('/app/employees/add');
   };
 
   const handleEditEmployee = (employee) => {
+    console.log('🎯 EDIT BUTTON CLICKED!', employee);
+    console.log('📝 Employee data:', employee);
+    
     setEditingEmployee(employee);
     setEditModalOpen(true);
+    setErrors({});
   };
 
   const handleViewEmployee = (employee) => {
@@ -123,9 +139,18 @@ const EmployeeList = () => {
   };
 
   const handleSaveEmployee = () => {
+    console.log('💾 Employee saved, refreshing list...');
     setEditModalOpen(false);
     setEditingEmployee(null);
-    fetchEmployees(); // Refresh the list
+    fetchEmployees();
+    notifySuccess('Employee updated successfully');
+  };
+
+  const handleCloseEditModal = () => {
+    console.log('❌ Closing edit modal');
+    setEditModalOpen(false);
+    setEditingEmployee(null);
+    setErrors({});
   };
 
   const handleDeleteClick = (employee) => {
@@ -137,6 +162,8 @@ const EmployeeList = () => {
     if (!employeeToDelete) return;
 
     setDeletingId(employeeToDelete.id);
+    setErrors({});
+    
     try {
       await employeeService.deleteEmployee(employeeToDelete.id);
       setEmployees(prev => prev.filter(emp => emp.id !== employeeToDelete.id));
@@ -145,6 +172,7 @@ const EmployeeList = () => {
       notifySuccess('Employee deleted successfully');
     } catch (error) {
       console.error('Failed to delete employee:', error);
+      setErrors({ delete: error.message });
       notifyError(error.message || 'Failed to delete employee');
     } finally {
       setDeletingId(null);
@@ -154,6 +182,7 @@ const EmployeeList = () => {
   const handleCloseDeleteModal = () => {
     setDeleteModalOpen(false);
     setEmployeeToDelete(null);
+    setErrors({});
   };
 
   const handleCloseViewModal = () => {
@@ -171,15 +200,20 @@ const EmployeeList = () => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      active: { color: 'green', text: 'Active' },
-      inactive: { color: 'red', text: 'Inactive' },
-      'on-leave': { color: 'yellow', text: 'On Leave' }
+      active: { color: 'green', text: 'Active', icon: '🟢' },
+      inactive: { color: 'red', text: 'Inactive', icon: '🔴' },
+      'on-leave': { color: 'yellow', text: 'On Leave', icon: '🟡' }
     };
 
-    const config = statusConfig[status] || { color: 'gray', text: status };
+    const config = statusConfig[status] || { color: 'gray', text: status, icon: '⚫' };
     
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${config.color}-100 text-${config.color}-800`}>
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+        isDark 
+          ? `bg-${config.color}-900 text-${config.color}-300` 
+          : `bg-${config.color}-100 text-${config.color}-800`
+      }`}>
+        <span className="mr-1">{config.icon}</span>
         {config.text}
       </span>
     );
@@ -246,6 +280,8 @@ const EmployeeList = () => {
     }
   };
 
+  
+
   return (
     <div className={`min-h-screen flex ${isDark ? 'bg-cyan-950 text-[#ffffff]' : 'bg-[#ffffff] text-gray-900'}`}>
       <SidebarWrapper collapsed={sidebarCollapsed} />
@@ -256,12 +292,29 @@ const EmployeeList = () => {
           {/* Connection Status */}
           <ConnectionStatus />
 
+          {/* Error Banner */}
+          {errors.fetch && (
+            <div className={`mb-6 p-4 rounded-xl border flex items-center ${
+              isDark 
+                ? 'bg-red-900/20 border-red-700 text-red-300' 
+                : 'bg-red-50 border-red-200 text-red-700'
+            }`}>
+              <FaExclamationTriangle className="w-5 h-5 mr-2" />
+              {errors.fetch}
+              <button 
+                onClick={fetchEmployees}
+                className="ml-auto px-3 py-1 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors flex items-center"
+              >
+                <FaSyncAlt className="w-3 h-3 mr-1" />
+                Retry
+              </button>
+            </div>
+          )}
+
           {/* Header Section */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
             <div className="flex items-center">
-              <svg className={`w-8 h-8 mr-3 ${isDark ? 'text-cyan-300' : 'text-[#f85924]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
+              <FaUser className={`w-8 h-8 mr-3 ${isDark ? 'text-cyan-300' : 'text-[#f85924]'}`} />
               <div>
                 <h1 className="text-2xl font-bold">Employee List</h1>
                 <p className={`text-sm ${isDark ? 'text-cyan-200' : 'text-gray-600'}`}>
@@ -272,9 +325,7 @@ const EmployeeList = () => {
             <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
               {/* Search Bar */}
               <div className={`relative flex-1 lg:flex-none lg:w-64 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                <svg className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${isDark ? 'text-cyan-400' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+                <FaSearch className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDark ? 'text-cyan-400' : 'text-gray-400'}`} />
                 <input
                   type="text"
                   placeholder="Search employees..."
@@ -295,11 +346,57 @@ const EmployeeList = () => {
                     : 'bg-[#f85924] hover:bg-[#d13602] text-white'
                 }`}
               >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
+                <FaPlus className="w-4 h-4 mr-2" />
                 Add Employee
               </button>
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className={`rounded-xl p-4 ${isDark ? 'bg-cyan-800' : 'bg-blue-50'}`}>
+              <div className="flex items-center">
+                <div className={`p-2 rounded-lg mr-3 ${isDark ? 'bg-cyan-700' : 'bg-blue-100'}`}>
+                  <FaUser className={isDark ? 'text-cyan-300' : 'text-blue-600'} />
+                </div>
+                <div>
+                  <p className={`text-sm ${isDark ? 'text-cyan-300' : 'text-gray-600'}`}>Total Employees</p>
+                  <p className="text-xl font-bold">{employees.length}</p>
+                </div>
+              </div>
+            </div>
+            <div className={`rounded-xl p-4 ${isDark ? 'bg-green-800' : 'bg-green-50'}`}>
+              <div className="flex items-center">
+                <div className={`p-2 rounded-lg mr-3 ${isDark ? 'bg-green-700' : 'bg-green-100'}`}>
+                  <FaUser className={isDark ? 'text-green-300' : 'text-green-600'} />
+                </div>
+                <div>
+                  <p className={`text-sm ${isDark ? 'text-green-300' : 'text-gray-600'}`}>Active</p>
+                  <p className="text-xl font-bold">{employees.filter(emp => emp.status === 'active').length}</p>
+                </div>
+              </div>
+            </div>
+            <div className={`rounded-xl p-4 ${isDark ? 'bg-yellow-800' : 'bg-yellow-50'}`}>
+              <div className="flex items-center">
+                <div className={`p-2 rounded-lg mr-3 ${isDark ? 'bg-yellow-700' : 'bg-yellow-100'}`}>
+                  <FaUser className={isDark ? 'text-yellow-300' : 'text-yellow-600'} />
+                </div>
+                <div>
+                  <p className={`text-sm ${isDark ? 'text-yellow-300' : 'text-gray-600'}`}>On Leave</p>
+                  <p className="text-xl font-bold">{employees.filter(emp => emp.status === 'on-leave').length}</p>
+                </div>
+              </div>
+            </div>
+            <div className={`rounded-xl p-4 ${isDark ? 'bg-purple-800' : 'bg-purple-50'}`}>
+              <div className="flex items-center">
+                <div className={`p-2 rounded-lg mr-3 ${isDark ? 'bg-purple-700' : 'bg-purple-100'}`}>
+                  <FaCrown className={isDark ? 'text-purple-300' : 'text-purple-600'} />
+                </div>
+                <div>
+                  <p className={`text-sm ${isDark ? 'text-purple-300' : 'text-gray-600'}`}>Managers</p>
+                  <p className="text-xl font-bold">{employees.filter(emp => emp.isManager).length}</p>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -319,9 +416,7 @@ const EmployeeList = () => {
                       onClick={() => handleSort('name')}
                     >
                       <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
+                        <FaUser className="w-4 h-4 mr-2" />
                         Name
                         <SortIcon columnKey="name" />
                       </div>
@@ -330,19 +425,14 @@ const EmployeeList = () => {
                       className="p-4 text-left font-semibold cursor-pointer hover:bg-opacity-50 transition-colors duration-200"
                       onClick={() => handleSort('position')}
                     >
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2V6" />
-                        </svg>
+                      <div className="flex items-center justify-center">
                         Position
                         <SortIcon columnKey="position" />
                       </div>
                     </th>
                     <th className="p-4 text-left font-semibold">
                       <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                        </svg>
+                        <FaPhone className="w-4 h-4 mr-2" />
                         Contact
                       </div>
                     </th>
@@ -354,28 +444,13 @@ const EmployeeList = () => {
                       onClick={() => handleSort('salary')}
                     >
                       <div className="flex items-center">
-                        <svg
-                          aria-hidden="true"
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="22"
-                          height="22"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#ff9500"
-                          strokeWidth="1"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M16.5 15.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
-                          <path d="M7 7a2 2 0 1 1 4 0v9a3 3 0 0 0 6 0v-.5" />
-                          <path d="M8 11h6" />
-                        </svg>
+                        <FaMoneyBillWave className="w-4 h-4 mr-2" />
                         Salary
                         <SortIcon columnKey="salary" />
                       </div>
                     </th>
                     <th className="p-4 text-left font-semibold">Status</th>
-                    <th className="p-4 text-left font-semibold">Actions</th>
+                    <th className="p-4 text-center font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -383,9 +458,7 @@ const EmployeeList = () => {
                     <tr>
                       <td colSpan="9" className="p-8 text-center">
                         <div className="flex justify-center items-center">
-                          <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${
-                            isDark ? 'border-cyan-400' : 'border-[#f85924]'
-                          }`}></div>
+                          <FaSpinner className="animate-spin w-8 h-8 text-[#f85924]" />
                         </div>
                       </td>
                     </tr>
@@ -393,15 +466,26 @@ const EmployeeList = () => {
                     <tr>
                       <td colSpan="9" className="p-8 text-center">
                         <div className="flex flex-col items-center justify-center">
-                          <svg className={`w-16 h-16 mb-4 ${isDark ? 'text-cyan-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                          </svg>
+                          <FaUser className={`w-16 h-16 mb-4 ${isDark ? 'text-cyan-600' : 'text-gray-400'}`} />
                           <p className={`text-lg font-medium ${isDark ? 'text-cyan-200' : 'text-gray-600'}`}>
-                            No employees found
+                            {searchTerm ? 'No matching employees found' : 'No employees found'}
                           </p>
                           <p className={`text-sm ${isDark ? 'text-cyan-400' : 'text-gray-500'}`}>
                             {searchTerm ? 'Try adjusting your search terms' : 'Get started by adding your first employee'}
                           </p>
+                          {!searchTerm && (
+                            <button
+                              onClick={handleAddEmployee}
+                              className={`mt-4 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                                isDark
+                                  ? 'bg-[#f85924] hover:bg-[#d13602] text-white'
+                                  : 'bg-[#f85924] hover:bg-[#d13602] text-white'
+                              }`}
+                            >
+                              <FaPlus className="w-4 h-4 mr-2 inline" />
+                              Add Employee
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -435,13 +519,18 @@ const EmployeeList = () => {
                           </div>
                         </td>
                         <td className="p-4">
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                            isDark 
-                              ? 'bg-cyan-700 text-cyan-200' 
-                              : 'bg-orange-100 text-[#f85924]'
-                          }`}>
-                            {employee.position}
-                          </span>
+                          <div className="flex items-center justify-center">
+                            <span className={`px-2 py-1 rounded-full text-sm font-medium flex items-center justify-center ${
+                              isDark 
+                                ? 'bg-cyan-700 text-cyan-200' 
+                                : 'bg-orange-100 text-[#f85924]'
+                            }`}>
+                              {employee.position}
+                            </span>
+                            {employee.isManager && (
+                              <FaCrown className="w-4 h-4 ml-2 text-yellow-500" title="Manager" />
+                            )}
+                          </div>
                         </td>
                         <td className="p-4">
                           <div className="space-y-1">
@@ -472,22 +561,7 @@ const EmployeeList = () => {
                         </td>
                         <td className="p-4 font-medium">
                           <div className="flex items-center">
-                            <svg
-                              aria-hidden="true"
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="22"
-                              height="22"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="#ff9500"
-                              strokeWidth="1"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M16.5 15.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
-                              <path d="M7 7a2 2 0 1 1 4 0v9a3 3 0 0 0 6 0v-.5" />
-                              <path d="M8 11h6" />
-                            </svg>
+                            <FaMoneyBillWave className="w-4 h-4 mr-2 text-green-500" />
                             {employee.salary?.toLocaleString()}
                           </div>
                         </td>
@@ -495,7 +569,7 @@ const EmployeeList = () => {
                           {getStatusBadge(employee.status)}
                         </td>
                         <td className="p-4">
-                          <div className="flex items-center gap-2">
+                          <div className="flex justify-center space-x-2">
                             <button
                               onClick={() => handleViewEmployee(employee)}
                               className={`p-2 rounded-lg transition-colors duration-200 ${
@@ -505,10 +579,7 @@ const EmployeeList = () => {
                               }`}
                               title="View details"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                              </svg>
+                              <FaEye className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleEditEmployee(employee)}
@@ -519,9 +590,7 @@ const EmployeeList = () => {
                               }`}
                               title="Edit employee"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
+                              <FaEdit className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleDeleteClick(employee)}
@@ -534,11 +603,9 @@ const EmployeeList = () => {
                               title="Delete employee"
                             >
                               {deletingId === employee.id ? (
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                                <FaSpinner className="animate-spin w-4 h-4" />
                               ) : (
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
+                                <FaTrash className="w-4 h-4" />
                               )}
                             </button>
                           </div>
@@ -567,7 +634,8 @@ const EmployeeList = () => {
         <EmployeeForm
           isEdit={true}
           employeeData={editingEmployee}
-          onClose={handleSaveEmployee}
+          onClose={handleCloseEditModal}
+          onSave={handleSaveEmployee}
         />
       )}
 
@@ -582,9 +650,7 @@ const EmployeeList = () => {
                 <div className={`p-3 rounded-xl mr-4 ${
                   isDark ? 'bg-cyan-800' : 'bg-orange-100'
                 }`}>
-                  <svg className={`w-6 h-6 ${isDark ? 'text-cyan-300' : 'text-[#f85924]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
+                  <FaUser className={`w-6 h-6 ${isDark ? 'text-cyan-300' : 'text-[#f85924]'}`} />
                 </div>
                 <div>
                   <h2 className="text-xl font-bold">Employee Details</h2>
@@ -599,66 +665,64 @@ const EmployeeList = () => {
                   isDark ? 'hover:bg-cyan-800' : 'hover:bg-gray-100'
                 }`}
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <FaTimes className="w-5 h-5" />
               </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">Full Name</label>
+                  <label className="block text-sm font-medium mb-1 text-gray-500">Full Name</label>
                   <p className="font-semibold">{viewingEmployee.name}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">Position</label>
+                  <label className="block text-sm font-medium mb-1 text-gray-500">Position</label>
                   <p>{viewingEmployee.position}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">Email</label>
+                  <label className="block text-sm font-medium mb-1 text-gray-500">Email</label>
                   <p>{viewingEmployee.email}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">NID Number</label>
+                  <label className="block text-sm font-medium mb-1 text-gray-500">NID Number</label>
                   <p className="font-mono">{viewingEmployee.nid}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">Date of Birth</label>
+                  <label className="block text-sm font-medium mb-1 text-gray-500">Date of Birth</label>
                   <p>{formatDate(viewingEmployee.dob)} (Age: {calculateAge(viewingEmployee.dob)} years)</p>
                 </div>
               </div>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">Contact Number</label>
+                  <label className="block text-sm font-medium mb-1 text-gray-500">Contact Number</label>
                   <p>{viewingEmployee.contact}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">WhatsApp Number</label>
+                  <label className="block text-sm font-medium mb-1 text-gray-500">WhatsApp Number</label>
                   <p>{viewingEmployee.whatsapp || 'Not provided'}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">Branch</label>
+                  <label className="block text-sm font-medium mb-1 text-gray-500">Branch</label>
                   <p>{branches[viewingEmployee.branchId] || 'Unknown'}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">Salary</label>
+                  <label className="block text-sm font-medium mb-1 text-gray-500">Salary</label>
                   <p className="font-semibold">${viewingEmployee.salary?.toLocaleString()}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">Joined Date</label>
+                  <label className="block text-sm font-medium mb-1 text-gray-500">Joined Date</label>
                   <p>{formatDate(viewingEmployee.joinedAt)}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">Status</label>
+                  <label className="block text-sm font-medium mb-1 text-gray-500">Status</label>
                   <div>{getStatusBadge(viewingEmployee.status)}</div>
                 </div>
               </div>
             </div>
 
             <div className="mt-6 pt-6 border-t border-gray-700">
-              <label className="block text-sm font-medium text-gray-500 mb-2">Address</label>
+              <label className="block text-sm font-medium mb-2 text-gray-500">Address</label>
               <p className="text-sm">{viewingEmployee.address}</p>
             </div>
 
@@ -697,9 +761,7 @@ const EmployeeList = () => {
               <div className={`p-2 rounded-lg mr-3 ${
                 isDark ? 'bg-red-900' : 'bg-red-100'
               }`}>
-                <svg className={`w-6 h-6 ${isDark ? 'text-red-400' : 'text-red-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
+                <FaExclamationTriangle className={`w-6 h-6 ${isDark ? 'text-red-400' : 'text-red-600'}`} />
               </div>
               <div>
                 <h3 className="text-lg font-bold">Delete Employee</h3>
@@ -708,6 +770,20 @@ const EmployeeList = () => {
                 </p>
               </div>
             </div>
+
+            {/* Error Display */}
+            {errors.delete && (
+              <div className={`mb-4 p-3 rounded-xl border ${
+                isDark 
+                  ? 'bg-red-900/20 border-red-700 text-red-300' 
+                  : 'bg-red-50 border-red-200 text-red-700'
+              }`}>
+                <div className="flex items-center">
+                  <FaExclamationTriangle className="w-4 h-4 mr-2" />
+                  {errors.delete}
+                </div>
+              </div>
+            )}
             
             <p className="mb-6">
               Are you sure you want to delete <strong>{employeeToDelete?.name}</strong>? This will permanently remove all their data.
@@ -732,7 +808,7 @@ const EmployeeList = () => {
               >
                 {deletingId ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <FaSpinner className="animate-spin w-4 h-4 mr-2" />
                     Deleting...
                   </>
                 ) : (

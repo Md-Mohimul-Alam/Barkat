@@ -16,6 +16,11 @@ const Login = () => {
   const [error, setError] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({
+    email: '',
+    password: '',
+    role: ''
+  });
 
   // Role mapping: UI role → DB role
   const roleMap = {
@@ -24,11 +29,38 @@ const Login = () => {
     'employee-dashboard': 'employee'
   };
 
+  const validateForm = () => {
+    const errors = {
+      email: '',
+      password: '',
+      role: ''
+    };
+
+    if (!email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      errors.email = 'Invalid email format';
+    }
+
+    if (!password) {
+      errors.password = 'Password is required';
+    } else if (password.length < 6) {
+      errors.password = 'Password must be at least 6 characters';
+    }
+
+    if (!selectedRole) {
+      errors.role = 'Please select a role';
+    }
+
+    setFieldErrors(errors);
+    return !errors.email && !errors.password && !errors.role;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!email || !password || !selectedRole) {
-      const msg = 'Please enter email, password, and select a role';
+    if (!validateForm()) {
+      const msg = 'Please fix the form errors';
       setError(msg);
       notifyError(msg);
       return;
@@ -43,6 +75,7 @@ const Login = () => {
 
       console.log('Calling authService.loginUser with:', { email, password: '***', backendRole });
       
+      // ✅ FIX: Use loginUser instead of login
       const data = await authService.loginUser(email, password, backendRole, rememberMe);
       console.log('Login response data:', data);
 
@@ -55,6 +88,7 @@ const Login = () => {
         if (userData.role !== backendRole) {
           const msg = 'Selected role does not match account role';
           setError(msg);
+          setFieldErrors(prev => ({ ...prev, role: msg }));
           notifyError(msg);
           return;
         }
@@ -103,6 +137,36 @@ const Login = () => {
     }
   };
 
+
+
+  const handleEmailChange = (e) => {
+    setEmail(e.target.value);
+    if (fieldErrors.email) {
+      setFieldErrors(prev => ({ ...prev, email: '' }));
+    }
+    if (error) setError('');
+  };
+
+  const handlePasswordChange = (e) => {
+    setPassword(e.target.value);
+    if (fieldErrors.password) {
+      setFieldErrors(prev => ({ ...prev, password: '' }));
+    }
+    if (error) setError('');
+  };
+
+  const handleRoleSelect = (role) => {
+    setSelectedRole(role);
+    if (fieldErrors.role) {
+      setFieldErrors(prev => ({ ...prev, role: '' }));
+    }
+    if (error) setError('');
+  };
+
+  const handleRememberMeChange = () => {
+    setRememberMe(!rememberMe);
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-white p-8 rounded shadow-lg">
@@ -112,47 +176,69 @@ const Login = () => {
           className="mx-auto h-20 w-20 object-contain"
         />
 
-        {error && <p className="text-red-500 mb-4 text-sm">{error}</p>}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Email</label>
             <input
               type="email"
-              className="w-full border border-gray-300 rounded px-3 py-2"
+              className={`w-full border rounded px-3 py-2 transition-colors ${
+                fieldErrors.email 
+                  ? 'border-red-500 bg-red-50' 
+                  : 'border-gray-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500'
+              }`}
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={handleEmailChange}
               placeholder="you@example.com"
               required
               disabled={loading}
             />
+            {fieldErrors.email && (
+              <p className="text-red-500 text-xs mt-1">{fieldErrors.email}</p>
+            )}
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-1">Password</label>
             <input
               type="password"
-              className="w-full border border-gray-300 rounded px-3 py-2"
+              className={`w-full border rounded px-3 py-2 transition-colors ${
+                fieldErrors.password 
+                  ? 'border-red-500 bg-red-50' 
+                  : 'border-gray-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500'
+              }`}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={handlePasswordChange}
               placeholder="********"
               required
               disabled={loading}
+              minLength="6"
             />
+            {fieldErrors.password && (
+              <p className="text-red-500 text-xs mt-1">{fieldErrors.password}</p>
+            )}
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-1">Role</label>
             <DropdownMenu
-              buttonLabel={selectedRole ? selectedRole : 'Select Role'}
+              buttonLabel={selectedRole ? selectedRole.replace('-dashboard', '') : 'Select Role'}
               items={[
                 { label: 'Admin', value: 'admin-dashboard' },
                 { label: 'Branch Manager', value: 'manager-dashboard' },
                 { label: 'Employee', value: 'employee-dashboard' }
               ]}
-              onSelect={(role) => setSelectedRole(role)}
+              onSelect={handleRoleSelect}
               disabled={loading}
             />
+            {fieldErrors.role && (
+              <p className="text-red-500 text-xs mt-1">{fieldErrors.role}</p>
+            )}
           </div>
 
           <div className="flex items-center justify-between">
@@ -160,15 +246,19 @@ const Login = () => {
               <input
                 type="checkbox"
                 checked={rememberMe}
-                onChange={() => setRememberMe(!rememberMe)}
-                className="h-4 w-4 text-blue-600"
+                onChange={handleRememberMeChange}
+                className={`h-4 w-4 rounded focus:ring-orange-500 text-orange-600 ${
+                  loading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
                 disabled={loading}
               />
-              <span>Remember Me</span>
+              <span className={loading ? 'opacity-50' : ''}>Remember Me</span>
             </label>
             <Link
               to="/forgot-password"
-              className="text-sm text-blue-500 hover:underline"
+              className={`text-sm text-blue-500 hover:underline transition-colors ${
+                loading ? 'opacity-50 pointer-events-none' : ''
+              }`}
             >
               Forgot Password?
             </Link>
@@ -177,7 +267,7 @@ const Login = () => {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full bg-orange-600 text-white py-2 rounded hover:bg-orange-700 transition flex items-center justify-center ${
+            className={`w-full bg-orange-600 text-white py-2 rounded hover:bg-orange-700 transition flex items-center justify-center font-medium ${
               loading ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
@@ -191,11 +281,26 @@ const Login = () => {
             )}
           </button>
         </form>
+
+        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
+          <p className="font-medium mb-2">Demo Accounts:</p>
+          <ul className="space-y-1 text-xs">
+            <li><strong>Admin:</strong> admin@mbt.com / admin123</li>
+            <li><strong>Manager:</strong> manager@mbt.com / manager123</li>
+            <li><strong>Employee:</strong> employee@mbt.com / employee123</li>
+          </ul>
+        </div>
+
         <div className="mt-4 text-center">
           <p className="text-sm text-gray-600">
             Don't have an account?{' '}
-            <Link to="/register" className="text-orange-500 hover:underline">
-              Sign Up
+            <Link 
+              to="/register" 
+              className={`text-orange-500 hover:underline transition-colors ${
+                loading ? 'opacity-50 pointer-events-none' : ''
+              }`}
+            >
+              Contact administrator
             </Link>
           </p>
         </div>

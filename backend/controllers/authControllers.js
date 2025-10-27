@@ -44,10 +44,10 @@ const register = async (req, res) => {
 };
 
 const login = async (req, res) => {
-  const { email, password, role } = req.body;
+  const { email, password, backendRole } = req.body; // ✅ FIX: Use backendRole
 
   try {
-    console.log('🔧 Login attempt:', { email, role });
+    console.log('🔧 Login attempt:', { email, backendRole }); // ✅ FIX: Log backendRole
     
     // Find user by email only (don't filter by role in login)
     const user = await User.findOne({ 
@@ -73,11 +73,11 @@ const login = async (req, res) => {
       });
     }
 
-    // Verify role matches (if role is provided)
-    if (role && user.role !== role) {
+    // ✅ FIX: Verify role matches (if backendRole is provided)
+    if (backendRole && user.role !== backendRole) {
       return res.status(401).json({ 
         success: false,
-        message: 'Invalid role for this user' 
+        message: `Invalid role for this user. Your account role is ${user.role}, but you selected ${backendRole}` 
       });
     }
 

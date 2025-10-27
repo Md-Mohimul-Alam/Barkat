@@ -1,86 +1,43 @@
-// src/services/api.js
-const BASE_URL = "http://localhost:5050/api";
+const API_BASE_URL = 'http://localhost:5050/api';
 
-const getToken = () => {
-  return localStorage.getItem('authToken') || 
-         sessionStorage.getItem('authToken') || 
-         null;
-};
-
-const apiRequest = async (endpoint, method = "GET", data = null) => {
-  const token = getToken();
+// Generic API request function
+const apiRequest = async (endpoint, options = {}) => {
+  const token = localStorage.getItem('authToken');
   
-  const headers = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
   const config = {
-    method,
-    headers,
-    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
+    },
+    ...options,
   };
-
-  if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
-    config.body = JSON.stringify(data);
-  }
 
   try {
-    console.log(`🔧 API ${method} Request: ${BASE_URL}${endpoint}`);
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
     
-    const response = await fetch(`${BASE_URL}${endpoint}`, config);
-    
-    console.log(`🔧 API Response Status: ${response.status}`);
-
-    // Handle unauthorized responses
-    if (response.status === 401) {
-      console.warn('Authentication failed, redirecting to login');
-      localStorage.removeItem('authToken');
-      sessionStorage.removeItem('authToken');
-      localStorage.removeItem('auth_user');
-      sessionStorage.removeItem('auth_user');
-      window.location.href = '/login';
-      throw new Error('Authentication failed. Please login again.');
-    }
-
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Request failed with status ${response.status}`);
+      const error = await response.json().catch(() => ({ message: 'Network error' }));
+      throw new Error(error.message || `HTTP error! status: ${response.status}`);
     }
 
-    const responseData = await response.json().catch(() => null);
-    
-    return {
-      success: true,
-      data: responseData,
-      status: response.status
-    };
-    
+    return await response.json();
   } catch (error) {
-    console.error('❌ API Request Error:', error);
-    
-    // Handle network errors specifically
-    if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
-      throw new Error('Cannot connect to server. Please check if the backend is running on port 5050.');
-    }
-    
-    // Don't throw if it's already a redirect
-    if (error.message.includes('Authentication failed')) {
-      throw error;
-    }
-    
-    throw new Error(error.message || 'API request failed');
+    console.error('API Request failed:', error);
+    throw error;
   }
 };
 
-const api = {
-  get: (endpoint) => apiRequest(endpoint),
-  post: (endpoint, data) => apiRequest(endpoint, 'POST', data),
-  put: (endpoint, data) => apiRequest(endpoint, 'PUT', data),
-  delete: (endpoint) => apiRequest(endpoint, 'DELETE'),
+// Helper methods for different HTTP verbs
+export const api = {
+  get: (endpoint, options) => apiRequest(endpoint, { ...options, method: 'GET' }),
+  post: (endpoint, data, options) => 
+    apiRequest(endpoint, { ...options, method: 'POST', body: JSON.stringify(data) }),
+  put: (endpoint, data, options) => 
+    apiRequest(endpoint, { ...options, method: 'PUT', body: JSON.stringify(data) }),
+  patch: (endpoint, data, options) => 
+    apiRequest(endpoint, { ...options, method: 'PATCH', body: JSON.stringify(data) }),
+  delete: (endpoint, options) => apiRequest(endpoint, { ...options, method: 'DELETE' }),
 };
 
 export default api;
