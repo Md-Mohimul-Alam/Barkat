@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import TopBar from '../shared/Topbar';
 import SidebarWrapper from '../shared/Sidebar';
+import { useNavigate } from 'react-router-dom';
 import Footer from '../shared/Footer';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -18,6 +19,8 @@ const UnloadingPointList = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingPoint, setEditingPoint] = useState(null);
+  const navigate = useNavigate();
+
 
   const handleEditPoint = (point) => {
     setEditingPoint({...point});
@@ -48,7 +51,7 @@ const UnloadingPointList = () => {
         <div className="p-6 flex-1">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold">Loading Points</h1>
-            <button
+            <button onClick={() => navigate('/app/loading-points/add')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${
                 isDark
                   ? 'bg-[#f85924] hover:bg-[#d13602] text-white shadow-lg'

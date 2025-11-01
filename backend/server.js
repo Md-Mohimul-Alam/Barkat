@@ -80,6 +80,8 @@ const transportRoutes = require('./routes/transportRoutes');
 app.use('/api/transport', authenticate, transportRoutes);
 console.log('✅ Transport routes loaded');
 
+
+
 // 5. Test protected route
 app.get('/api/protected-test', authenticate, (req, res) => {
   res.json({

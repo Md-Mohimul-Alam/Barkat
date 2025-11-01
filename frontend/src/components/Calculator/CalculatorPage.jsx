@@ -161,9 +161,9 @@ const CalculatorPage = () => {
   };
 
   return (
-    <div className={`h-screen  flex overflow-hidden ${isDark ? 'bg-mbts-blue text-white' : 'bg-gray-100 text-gray-900'}`}>
+    <div className={`h-[888px] overflow-hidden flex ${isDark ? 'bg-transparent text-white' : 'bg-transparent text-gray-900'}`}>
       <SidebarWrapper collapsed={sidebarCollapsed}/>
-        <div className="flex-1 flex flex-col h-full overflow-hidden">
+        <div className="flex-1 flex flex-col h-[888px] !mt-0 overflow-hidden">
           <div className="sticky top-0 z-50">
             <TopBar
               onToggleSidebar={() => setSidebarCollapsed((p) => !p)}
@@ -172,7 +172,7 @@ const CalculatorPage = () => {
           </div>
 
           {/* Main Content Area */}
-          <div className='h-full w-f relative overflow-y-auto mb-10'> 
+          <div className='h-full w-f relative overflow-y-auto '> 
             <div className='flex-1 flex flex-col h-full overflow-y-auto'>
               <div className="flex justify-center items-start  overflow-auto w-full">
                 <div
