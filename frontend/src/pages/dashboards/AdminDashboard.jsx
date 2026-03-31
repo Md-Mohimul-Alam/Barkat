@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   FaBuilding, FaUser, FaPhone, FaMapMarker, FaCalendar, 
   FaEye, FaArrowRight, FaUsers, FaChartBar, FaCog,
-  FaPlus, FaDownload, FaShoppingCart, FaMoneyBillWave
+  FaPlus, FaDownload, FaShoppingCart, FaMoneyBillWave,
+  FaSyncAlt, FaExclamationTriangle
 } from 'react-icons/fa';
 import TopBar from '../../components/shared/Topbar';
 import SidebarWrapper from '../../components/shared/Sidebar';
@@ -18,9 +19,9 @@ const AdminDashboard = () => {
   const [branches, setBranches] = useState([]);
   const [cnfs, setCnfs] = useState([]);
   const [clients, setClients] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(true);
   const [activeStat, setActiveStat] = useState(null);
+  const [errors, setErrors] = useState({});
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -52,148 +53,197 @@ const AdminDashboard = () => {
     navigate('/app/clients/add');
   };
 
-  // Debug the auth context
-  console.log('🔐 Auth Context Debug:', {
-    user: user,
-    hasToken: !!user?.token,
-    token: user?.token ? '***' + user.token.slice(-10) : 'No token',
-    userData: user
-  });
-
-  // Also check localStorage directly
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-    console.log('💾 LocalStorage Debug:', {
-      token: token ? '***' + token.slice(-10) : 'No token',
-      userData: userData ? JSON.parse(userData) : 'No user data'
-    });
-  }, []);
-
-  // Fetch all dashboard data
+  // Fetch all dashboard data - SIMPLIFIED version
   useEffect(() => {
     const fetchDashboardData = async () => {
-      // Check multiple places for token
-      const tokenFromContext = user?.token;
-      const tokenFromStorage = localStorage.getItem('token');
-      const currentToken = tokenFromContext || tokenFromStorage;
-      
-      console.log('🔍 Token check:', {
-        fromContext: !!tokenFromContext,
-        fromStorage: !!tokenFromStorage,
-        currentToken: currentToken ? '***' + currentToken.slice(-10) : 'No token'
-      });
-
-      if (!currentToken) {
-        console.log('❌ No token available - redirecting to login');
-        setStatsLoading(false);
-        return;
-      }
-      
       try {
         setStatsLoading(true);
-        console.log('🔄 Starting dashboard data fetch with token...');
+        setErrors({});
         
-        // Fetch with timeout to prevent hanging
-        const fetchWithTimeout = (serviceCall, timeout = 10000) => {
-          return Promise.race([
-            serviceCall,
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Request timeout')), timeout)
-            )
-          ]);
-        };
-
-        const [branchesData, cnfsData, clientsData] = await Promise.allSettled([
-          fetchWithTimeout(branchService.getBranches()),
-          fetchWithTimeout(cnfService.getAllCNFs()),
-          fetchWithTimeout(clientService.getClients())
-        ]);
-
-        console.log('📊 Dashboard fetch results:', {
-          branches: branchesData,
-          cnfs: cnfsData,
-          clients: clientsData
-        });
-
-        // Helper function to extract arrays from various response formats
-        const extractArrayFromResponse = (response, type) => {
-          console.log(`🛠️ Extracting ${type} from:`, response);
+        console.log('🔄 Starting dashboard data fetch...');
+        
+        // Fetch branches - using the same pattern as BranchList
+        try {
+          console.log('📥 Fetching branches...');
+          const branchesResponse = await branchService.getBranches();
+          console.log('📦 Branches raw response:', branchesResponse);
           
-          if (!response) {
-            console.log(`❌ No response for ${type}`);
-            return [];
+          let branchesData = [];
+          
+          // Match the pattern from BranchList
+          if (branchesResponse && branchesResponse.success && Array.isArray(branchesResponse.data)) {
+            branchesData = branchesResponse.data;
+          } else if (Array.isArray(branchesResponse)) {
+            branchesData = branchesResponse;
+          } else if (branchesResponse && Array.isArray(branchesResponse.data)) {
+            branchesData = branchesResponse.data;
           }
           
-          if (Array.isArray(response)) {
-            console.log(`✅ ${type}: Direct array with ${response.length} items`);
-            return response;
-          }
-          
-          if (response.data && Array.isArray(response.data)) {
-            console.log(`✅ ${type}: response.data array with ${response.data.length} items`);
-            return response.data;
-          }
-          
-          if (response[type] && Array.isArray(response[type])) {
-            console.log(`✅ ${type}: response.${type} array with ${response[type].length} items`);
-            return response[type];
-          }
-          
-          if (response.success && response.data && Array.isArray(response.data)) {
-            console.log(`✅ ${type}: response.success.data array with ${response.data.length} items`);
-            return response.data;
-          }
-          
-          if (typeof response === 'object' && response !== null && !Array.isArray(response)) {
-            console.log(`✅ ${type}: Single object, wrapping in array`);
-            return [response];
-          }
-          
-          console.log(`❌ ${type}: Could not extract array from response, returning empty array`);
-          return [];
-        };
-
-        // Handle branches
-        if (branchesData.status === 'fulfilled') {
-          const branchesArray = extractArrayFromResponse(branchesData.value, 'branches');
-          console.log('✅ Branches loaded:', branchesArray.length);
-          setBranches(branchesArray.slice(0, 6));
-        } else {
-          console.error('❌ Branches failed:', branchesData.reason);
-          setBranches([]);
+          console.log(`✅ Branches loaded: ${branchesData.length}`);
+          setBranches(branchesData);
+        } catch (branchError) {
+          console.error('❌ Branches fetch error:', branchError);
+          setErrors(prev => ({ ...prev, branches: branchError.message }));
         }
 
-        // Handle CNFs
-        if (cnfsData.status === 'fulfilled') {
-          const cnfsArray = extractArrayFromResponse(cnfsData.value, 'cnfs');
-          console.log('✅ CNFs loaded:', cnfsArray.length);
-          setCnfs(cnfsArray.slice(0, 6));
-        } else {
-          console.error('❌ CNFs failed:', cnfsData.reason);
-          setCnfs([]);
+        // Fetch CNFs - using the same pattern as CNFList
+        try {
+          console.log('📥 Fetching CNFs...');
+          const cnfsResponse = await cnfService.getCNFs();
+          console.log('📦 CNFs raw response:', cnfsResponse);
+          
+          let cnfsData = [];
+          
+          // Match the pattern from CNFList
+          if (Array.isArray(cnfsResponse)) {
+            cnfsData = cnfsResponse;
+          } else if (cnfsResponse && Array.isArray(cnfsResponse.data)) {
+            cnfsData = cnfsResponse.data;
+          } else if (cnfsResponse && cnfsResponse.success && Array.isArray(cnfsResponse.data)) {
+            cnfsData = cnfsResponse.data;
+          } else if (cnfsResponse && cnfsResponse.cnfs && Array.isArray(cnfsResponse.cnfs)) {
+            cnfsData = cnfsResponse.cnfs;
+          }
+          
+          console.log(`✅ CNFs loaded: ${cnfsData.length}`);
+          setCnfs(cnfsData);
+        } catch (cnfError) {
+          console.error('❌ CNFs fetch error:', cnfError);
+          setErrors(prev => ({ ...prev, cnfs: cnfError.message }));
         }
 
-        // Handle clients
-        if (clientsData.status === 'fulfilled') {
-          const clientsArray = extractArrayFromResponse(clientsData.value, 'clients');
-          console.log('✅ Clients loaded:', clientsArray.length);
-          setClients(clientsArray.slice(0, 6));
-        } else {
-          console.error('❌ Clients failed:', clientsData.reason);
-          setClients([]);
+        // Fetch clients - using the same pattern as ClientList
+        try {
+          console.log('📥 Fetching clients...');
+          const clientsResponse = await clientService.getClients();
+          console.log('📦 Clients raw response:', clientsResponse);
+          
+          let clientsData = [];
+          
+          // Match the pattern from ClientList
+          if (clientsResponse && clientsResponse.clients && Array.isArray(clientsResponse.clients)) {
+            clientsData = clientsResponse.clients;
+          } else if (Array.isArray(clientsResponse)) {
+            clientsData = clientsResponse;
+          } else if (clientsResponse && Array.isArray(clientsResponse.data)) {
+            clientsData = clientsResponse.data;
+          } else if (clientsResponse && clientsResponse.success && Array.isArray(clientsResponse.data)) {
+            clientsData = clientsResponse.data;
+          }
+          
+          console.log(`✅ Clients loaded: ${clientsData.length}`);
+          setClients(clientsData);
+        } catch (clientError) {
+          console.error('❌ Clients fetch error:', clientError);
+          setErrors(prev => ({ ...prev, clients: clientError.message }));
         }
-
-      } catch (err) {
-        console.error('💥 Dashboard data fetch error:', err);
+        
+      } catch (error) {
+        console.error('💥 Dashboard data fetch error:', error);
+        setErrors(prev => ({ ...prev, general: error.message }));
       } finally {
         console.log('🏁 Dashboard loading complete');
+        console.log('📊 Final counts:', { 
+          branches: branches.length, 
+          cnfs: cnfs.length, 
+          clients: clients.length 
+        });
         setStatsLoading(false);
       }
     };
 
     fetchDashboardData();
-  }, [user?.token, navigate]);
+  }, []);
+
+  // Manual refresh function
+  const handleRefresh = () => {
+    console.log('🔄 Manual refresh triggered');
+    setStatsLoading(true);
+    setTimeout(() => {
+      fetchDashboardData();
+    }, 100);
+  };
+
+  // Function to fetch data - duplicated for refresh
+  const fetchDashboardData = async () => {
+    try {
+      setStatsLoading(true);
+      setErrors({});
+      
+      console.log('🔄 Starting dashboard data fetch...');
+      
+      // Fetch branches
+      try {
+        const branchesResponse = await branchService.getBranches();
+        let branchesData = [];
+        
+        if (branchesResponse && branchesResponse.success && Array.isArray(branchesResponse.data)) {
+          branchesData = branchesResponse.data;
+        } else if (Array.isArray(branchesResponse)) {
+          branchesData = branchesResponse;
+        } else if (branchesResponse && Array.isArray(branchesResponse.data)) {
+          branchesData = branchesResponse.data;
+        }
+        
+        console.log(`✅ Branches loaded: ${branchesData.length}`);
+        setBranches(branchesData);
+      } catch (branchError) {
+        console.error('❌ Branches fetch error:', branchError);
+        setErrors(prev => ({ ...prev, branches: branchError.message }));
+      }
+
+      // Fetch CNFs
+      try {
+        const cnfsResponse = await cnfService.getCNFs();
+        let cnfsData = [];
+        
+        if (Array.isArray(cnfsResponse)) {
+          cnfsData = cnfsResponse;
+        } else if (cnfsResponse && Array.isArray(cnfsResponse.data)) {
+          cnfsData = cnfsResponse.data;
+        } else if (cnfsResponse && cnfsResponse.success && Array.isArray(cnfsResponse.data)) {
+          cnfsData = cnfsResponse.data;
+        } else if (cnfsResponse && cnfsResponse.cnfs && Array.isArray(cnfsResponse.cnfs)) {
+          cnfsData = cnfsResponse.cnfs;
+        }
+        
+        console.log(`✅ CNFs loaded: ${cnfsData.length}`);
+        setCnfs(cnfsData);
+      } catch (cnfError) {
+        console.error('❌ CNFs fetch error:', cnfError);
+        setErrors(prev => ({ ...prev, cnfs: cnfError.message }));
+      }
+
+      // Fetch clients
+      try {
+        const clientsResponse = await clientService.getClients();
+        let clientsData = [];
+        
+        if (clientsResponse && clientsResponse.clients && Array.isArray(clientsResponse.clients)) {
+          clientsData = clientsResponse.clients;
+        } else if (Array.isArray(clientsResponse)) {
+          clientsData = clientsResponse;
+        } else if (clientsResponse && Array.isArray(clientsResponse.data)) {
+          clientsData = clientsResponse.data;
+        } else if (clientsResponse && clientsResponse.success && Array.isArray(clientsResponse.data)) {
+          clientsData = clientsResponse.data;
+        }
+        
+        console.log(`✅ Clients loaded: ${clientsData.length}`);
+        setClients(clientsData);
+      } catch (clientError) {
+        console.error('❌ Clients fetch error:', clientError);
+        setErrors(prev => ({ ...prev, clients: clientError.message }));
+      }
+      
+    } catch (error) {
+      console.error('💥 Dashboard data fetch error:', error);
+      setErrors(prev => ({ ...prev, general: error.message }));
+    } finally {
+      console.log('🏁 Dashboard loading complete');
+      setStatsLoading(false);
+    }
+  };
 
   // Enhanced Stats with real data integration
   const stats = [
@@ -322,6 +372,13 @@ const AdminDashboard = () => {
                   <p className="text-gray-600 text-lg">Welcome back, {user?.name}! Here's your system overview.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  <button 
+                    onClick={handleRefresh}
+                    className="bg-blue-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-600 transition-colors flex items-center text-sm"
+                  >
+                    <FaSyncAlt className="w-4 h-4 mr-2" />
+                    Refresh Data
+                  </button>
                   <button className="bg-[#fb8129] border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-[#df6006] transition-colors flex items-center text-sm">
                     <FaDownload className="w-4 h-4 mr-2" />
                     Export Report
@@ -329,6 +386,31 @@ const AdminDashboard = () => {
                 </div>
               </div>
             </div>
+
+            {/* Error Display */}
+            {Object.keys(errors).length > 0 && (
+              <div className="mb-6 p-4 rounded-xl border border-red-300 bg-red-50">
+                <div className="flex items-center mb-2">
+                  <FaExclamationTriangle className="w-5 h-5 text-red-600 mr-2" />
+                  <h3 className="font-semibold text-red-700">Data Fetch Errors</h3>
+                </div>
+                {Object.entries(errors).map(([key, error]) => (
+                  <p key={key} className="text-sm text-red-600 ml-7">
+                    <strong>{key}:</strong> {error}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            {/* Debug Info */}
+            {!statsLoading && (
+              <div className="mb-4 p-3 bg-gray-100 rounded-lg text-sm">
+                <div className="flex items-center">
+                  <span className="font-medium">Data Status:</span>
+                  <span className="ml-2">Branches: {branches.length} | CNFs: {cnfs.length} | Clients: {clients.length}</span>
+                </div>
+              </div>
+            )}
 
             {/* Enhanced Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
@@ -406,9 +488,9 @@ const AdminDashboard = () => {
                     </div>
                   ) : branches.length > 0 ? (
                     <div className="space-y-4">
-                      {branches.slice(0, 3).map((branch) => (
+                      {branches.slice(0, 3).map((branch, index) => (
                         <div 
-                          key={branch.id}
+                          key={branch.id || index}
                           className="border border-gray-200 rounded-xl p-4 hover:border-green-300 hover:shadow-md transition-all duration-300 group cursor-pointer"
                           onClick={() => navigate(`/app/branches`)}
                         >
@@ -418,14 +500,14 @@ const AdminDashboard = () => {
                                 <FaBuilding className="w-4 h-4 text-green-600" />
                               </div>
                               <div className="min-w-0">
-                                <h3 className="font-semibold text-gray-800 truncate">{branch.name}</h3>
-                                <p className="text-gray-500 text-sm truncate">{branch.manager}</p>
+                                <h3 className="font-semibold text-gray-800 truncate">{branch.name || 'Unnamed Branch'}</h3>
+                                <p className="text-gray-500 text-sm truncate">{branch.manager?.name || branch.manager || 'No manager'}</p>
                               </div>
                             </div>
                           </div>
                           <div className="flex justify-between items-center text-xs text-gray-500">
-                            <span>{branch.contact}</span>
-                            <span>{branch.establishedAt?.split('T')[0]}</span>
+                            <span>{branch.contact || 'No contact'}</span>
+                            <span>{branch.establishedAt ? new Date(branch.establishedAt).toLocaleDateString() : 'No date'}</span>
                           </div>
                         </div>
                       ))}
@@ -460,7 +542,7 @@ const AdminDashboard = () => {
                     </div>
                     <button 
                       onClick={handleViewAllCNFs}
-                    className="flex items-center text-[#f97316] hover:text-[#e45f00] font-medium text-sm group self-start sm:self-auto"
+                      className="flex items-center text-[#f97316] hover:text-[#e45f00] font-medium text-sm group self-start sm:self-auto"
                     >
                       View All
                       <FaArrowRight className="w-3 h-3 ml-2 group-hover:translate-x-1 transition-transform" />
@@ -479,9 +561,9 @@ const AdminDashboard = () => {
                     </div>
                   ) : cnfs.length > 0 ? (
                     <div className="space-y-4">
-                      {cnfs.slice(0, 2).map((cnf) => (
+                      {cnfs.slice(0, 3).map((cnf, index) => (
                         <div 
-                          key={cnf.id}
+                          key={cnf.id || index}
                           className="border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-md transition-all duration-300 group cursor-pointer"
                           onClick={() => navigate(`/app/cnfs`)}
                         >
@@ -491,14 +573,14 @@ const AdminDashboard = () => {
                                 <FaUsers className="w-4 h-4 text-blue-600" />
                               </div>
                               <div className="min-w-0">
-                                <h3 className="font-semibold text-gray-800 truncate">{cnf.name}</h3>
-                                <p className="text-gray-500 text-sm truncate">{cnf.contact}</p>
+                                <h3 className="font-semibold text-gray-800 truncate">{cnf.name || 'Unnamed CNF'}</h3>
+                                <p className="text-gray-500 text-sm truncate">{cnf.contact || 'No contact'}</p>
                               </div>
                             </div>
                           </div>
                           <div className="flex justify-between items-center text-xs text-gray-500">
-                            <span className="truncate">{cnf.address}</span>
-                            <span>{cnf.establishedAt?.split('T')[0]}</span>
+                            <span className="truncate">{cnf.address || 'No address'}</span>
+                            <span>{cnf.establishedAt ? new Date(cnf.establishedAt).toLocaleDateString() : 'No date'}</span>
                           </div>
                         </div>
                       ))}
@@ -552,9 +634,9 @@ const AdminDashboard = () => {
                     </div>
                   ) : clients.length > 0 ? (
                     <div className="space-y-4">
-                      {clients.slice(0, 2).map((client) => (
+                      {clients.slice(0, 3).map((client, index) => (
                         <div 
-                          key={client.id}
+                          key={client.id || index}
                           className="border border-gray-200 rounded-xl p-4 hover:border-orange-300 hover:shadow-md transition-all duration-300 group cursor-pointer"
                           onClick={() => navigate(`/app/clients`)}
                         >
@@ -564,14 +646,14 @@ const AdminDashboard = () => {
                                 <FaUser className="w-4 h-4 text-orange-600" />
                               </div>
                               <div className="min-w-0">
-                                <h3 className="font-semibold text-gray-800 truncate">{client.name}</h3>
-                                <p className="text-gray-500 text-sm truncate">{client.manager}</p>
+                                <h3 className="font-semibold text-gray-800 truncate">{client.name || 'Unnamed Client'}</h3>
+                                <p className="text-gray-500 text-sm truncate">{client.manager || 'No manager'}</p>
                               </div>
                             </div>
                           </div>
                           <div className="flex justify-between items-center text-xs text-gray-500">
-                            <span>{client.contact}</span>
-                            <span>{client.establishedAt?.split('T')[0]}</span>
+                            <span>{client.contact || 'No contact'}</span>
+                            <span>{client.establishedAt ? new Date(client.establishedAt).toLocaleDateString() : 'No date'}</span>
                           </div>
                         </div>
                       ))}

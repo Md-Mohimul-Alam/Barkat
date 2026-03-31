@@ -3,7 +3,8 @@ import { useTheme } from '../../context/ThemeContext';
 import TopBar from '../shared/Topbar';
 import SidebarWrapper from '../shared/Sidebar';
 import Footer from '../shared/Footer';
-import Tesseract from 'tesseract.js';
+import { createWorker } from 'tesseract.js';
+import heic2any from 'heic2any'; // Add this import
 
 const VEHICLE_CAPACITY = {
   sixWheels: 15,
@@ -21,6 +22,18 @@ const CalculatorPage = () => {
   const [weights, setWeights] = useState([{ id: 1, weight: '' }]);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const fileInputRef = useRef(null);
+  const workerRef = useRef(null); // Add worker reference
+
+  // Initialize Tesseract worker on mount
+  useEffect(() => {
+    const initWorker = async () => {
+      workerRef.current = await createWorker('eng');
+    };
+    initWorker();
+    return () => {
+      if (workerRef.current) workerRef.current.terminate();
+    };
+  }, []);
 
   const [customRates, setCustomRates] = useState({
     sixWheels: { solid: '', min: '18000', max: '22000' },
@@ -91,7 +104,6 @@ const CalculatorPage = () => {
     const totalCost = ((baseRate * vehicleCount));
     const costPerTon = totalCost / totalWeight;
     
-    
     const commissionPerVehicle = 2000;
     const totalCostWithCommission = (baseRate + commissionPerVehicle) * vehicleCount;
     const costPerTonWithCommission = totalCostWithCommission / totalWeight;
@@ -102,7 +114,7 @@ const CalculatorPage = () => {
 
     const includedItems = weights.filter(w => parseNumber(w.weight) <= capacity);
 
-    return { vehicleType, vehicleCount, totalCost, costPerTon, efficiency, includedItems, baseRate, totalCostWithCommission,costPerTonWithCommission };
+    return { vehicleType, vehicleCount, totalCost, costPerTon, efficiency, includedItems, baseRate, totalCostWithCommission, costPerTonWithCommission };
   };
 
   const estimates = ['sixWheels', 'twelveWheels', 'trailer', 'lowbed']
@@ -137,29 +149,87 @@ const CalculatorPage = () => {
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
-    if (file) {
-      setIsProcessingImage(true);
-      try {
-        const { data } = await Tesseract.recognize(file, 'eng', { logger: m => console.log(m) });
-        const weightMatches = [...data.text.matchAll(/(\d+(\.\d+)?)\s*(ton|tons|t)?/gi)]
-          .map(m => parseFloat(m[1]))
-          .filter(w => w > 0 && w < 100);
-        if (weightMatches.length) {
-          setWeights((prev) => [
-            ...prev,
-            ...weightMatches.map((w) => ({ id: Date.now() + Math.random(), weight: w })),
-          ]);
-        } else {
-          alert('No valid weights found in image');
-        }
-      } catch (err) {
-        console.error('OCR Error:', err);
-        alert('Failed to extract data from image');
+    if (!file) return;
+
+    setIsProcessingImage(true);
+    try {
+      let processedFile = file;
+
+      // Convert HEIC/HEIF to PNG using heic2any
+      if (file.type === 'image/heic' || file.type === 'image/heif' || file.name.match(/\.(heic|heif)$/i)) {
+        console.log('HEIC file detected, converting to PNG...');
+        const blob = await heic2any({
+          blob: file,
+          toType: 'image/png',
+          quality: 0.8,
+        });
+        processedFile = new File([blob], file.name.replace(/\.(heic|heif)$/i, '.png'), { type: 'image/png' });
       }
+
+      // Convert to data URL
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(processedFile);
+      });
+
+      // Load image and resize if needed
+      const img = new Image();
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = dataUrl;
+      });
+
+      const maxDimension = 1500;
+      let width = img.width;
+      let height = img.height;
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = (height / width) * maxDimension;
+          width = maxDimension;
+        } else {
+          width = (width / height) * maxDimension;
+          height = maxDimension;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      const pngDataUrl = canvas.toDataURL('image/png');
+
+      // Perform OCR using the worker
+      if (!workerRef.current) {
+        throw new Error('OCR worker not ready');
+      }
+      const result = await workerRef.current.recognize(pngDataUrl);
+      const { data } = result;
+
+      // Extract weights
+      const weightMatches = [...data.text.matchAll(/(\d+(\.\d+)?)\s*(ton|tons|t)?/gi)]
+        .map(m => parseFloat(m[1]))
+        .filter(w => w > 0 && w < 100);
+
+      if (weightMatches.length) {
+        setWeights(prev => [
+          ...prev,
+          ...weightMatches.map(w => ({ id: Date.now() + Math.random(), weight: w })),
+        ]);
+      } else {
+        alert('No valid weights found in image');
+      }
+    } catch (err) {
+      console.error('OCR Error:', err);
+      alert(`Failed to extract data: ${err.message || 'Unknown error'}`);
+    } finally {
       setIsProcessingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
-
   return (
     <div className={`h-[888px] overflow-hidden flex ${isDark ? 'bg-transparent text-white' : 'bg-transparent text-gray-900'}`}>
       <SidebarWrapper collapsed={sidebarCollapsed}/>
